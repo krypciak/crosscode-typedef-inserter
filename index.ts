@@ -9,7 +9,6 @@ export function assert(v: any, msg?: string): asserts v {
 import ts, { SyntaxKind } from 'typescript'
 import * as fs from 'fs'
 import * as path from 'path'
-import { contains } from 'jquery'
 
 const fileExists = async (path: string) => !!(await fs.promises.stat(path).catch(_ => false))
 
@@ -35,8 +34,76 @@ function defVarList(): VarList {
     }
 }
 
+type IndentStyle = 'tab' | '2space' | '4space'
+function getIndentStyleOfFile(lines: string[]): IndentStyle {
+    let lastIndent = 0
+    for (let line of lines) {
+        let spaces = 0
+        while (line.startsWith(' ')) {
+            spaces++
+            line = line.slice(1)
+        }
+        let tabs = 0
+        while (line.startsWith('\t')) {
+            tabs++
+            line = line.slice(1)
+        }
+        if (tabs != 0) assert(spaces == 0)
+        if (spaces != 0) assert(tabs == 0)
+
+        if (tabs != 0) return 'tab'
+        if (spaces != 0) {
+            if (lastIndent) {
+                const diff = Math.abs(lastIndent - spaces)
+                if (diff == 2) return '2space'
+                else if (diff == 4) return '4space'
+                else assert(false)
+            }
+            lastIndent = spaces
+        }
+    }
+    return '4space'
+}
+function getIndentCountOfLine(style: IndentStyle, line: string) {
+    if (style == 'tab') {
+        for (let i = 0; i < line.length; i++) if (line[i] != '\t') return i
+    } else if (style == '2space') {
+        for (let i = 0; i < line.length; i++)
+            if (line[i] != ' ') {
+                assert((i / 2) % 1 == 0)
+                return i / 2
+            }
+    } else if (style == '4space') {
+        for (let i = 0; i < line.length; i++)
+            if (line[i] != ' ') {
+                assert((i / 4) % 1 == 0)
+                return i / 4
+            }
+    }
+    assert(false)
+}
+function getIndentX(style: IndentStyle, count: number) {
+    if (style == 'tab') return '\t'.repeat(count)
+    if (style == '2space') return '  '.repeat(count)
+    if (style == '4space') return '    '.repeat(count)
+}
+
 const typedefModulesPath = `${typedefRepoPath}/modules`
-const typedefModuleList = (await fs.promises.readdir(typedefModulesPath)).map(a => a.slice(0, -5))
+const typedefModuleList = (await fs.promises.readdir(typedefModulesPath)).map(a => a.slice(0, -5)).filter(Boolean)
+const typedefModulesIndentStyles: Record<string, IndentStyle> = (
+    await Promise.all(
+        typedefModuleList.map(async module => {
+            const str = await fs.promises.readFile(typedefModulesPath + '/' + module + '.d.ts', 'utf8')
+            return { module, indentStyle: getIndentStyleOfFile(str.split('\n')) }
+        })
+    )
+).reduce(
+    (acc, { module, indentStyle }) => {
+        acc[module] = indentStyle
+        return acc
+    },
+    {} as Record<string, IndentStyle>
+)
 
 let typedefModuleRecord: Record<string, Record<string, VarList>> = {}
 for (const module of typedefModuleList) typedefModuleRecord[module] = {}
@@ -45,6 +112,7 @@ Array.prototype.last = function (this: []) {
     return this[this.length - 1]
 }
 async function getModulesInfo(force: boolean = false) {
+    console.log('reading from typedefs...')
     if (!force && (await fileExists(outTypesPath))) {
         const data = JSON.parse(await fs.promises.readFile(outTypesPath, 'utf8'))
         typedefModuleRecord = data
@@ -135,8 +203,15 @@ async function getModulesInfo(force: boolean = false) {
 }
 await getModulesInfo(false)
 
-const typeInjects: { pos: number; type: string }[] = []
+// prettier-ignore
+const changeQueue: ({ pos: number } & (
+    { operation: 'inject'; type: string } |
+    { operation: 'rename'; from: string; to: string }
+))[] = []
+
 async function getTypeInjects() {
+    console.log('gathering all changes...')
+    const gameCompiledSplit: string[] = (await fs.promises.readFile(gameCompiledPath, 'utf8')).split('\n')
     const program = ts.createProgram([gameCompiledPath], {
         target: ts.ScriptTarget.ES5,
         module: ts.ModuleKind.CommonJS,
@@ -145,6 +220,8 @@ async function getTypeInjects() {
 
     program.getTypeChecker()
 
+    const gameCompiledIndentStyle: IndentStyle = getIndentStyleOfFile(gameCompiledSplit)
+
     const gameCompiledPathBase = path.basename(gameCompiledPath)
     for (const sourceFile of program.getSourceFiles()) {
         const baseName = path.basename(sourceFile.fileName)
@@ -152,7 +229,6 @@ async function getTypeInjects() {
 
         ts.forEachChild(sourceFile, node => rootVisit(node))
     }
-    return
 
     function rootVisit(node: ts.Node, depth: number = 0) {
         if (ts.isCallExpression(node)) {
@@ -174,11 +250,8 @@ async function getTypeInjects() {
                     assert(ts.isFunctionExpression(func))
                     const innerSyntaxList = func.body.getChildren()[1]
                     assert(innerSyntaxList.kind == 352)
-                    if (true || module == 'impact.base.image') {
-                        // console.log(module)
-                        for (const child of innerSyntaxList.getChildren()) {
-                            visit(child, module, [])
-                        }
+                    for (const child of innerSyntaxList.getChildren()) {
+                        visit(child, module, [])
                     }
                 }
             }
@@ -186,17 +259,19 @@ async function getTypeInjects() {
         if (depth < 6) ts.forEachChild(node, node => rootVisit(node, depth + 1))
     }
 
-    function print(node: ts.Node) {
-        console.log(
-            node.getChildren().map(a => {
-                return {
-                    kind: a.kind,
-                    text: a.getText().slice(0, 100),
-                }
-            })
-        )
-    }
+    // function print(node: ts.Node) {
+    //     console.log(
+    //         node.getChildren().map(a => {
+    //             return {
+    //                 kind: a.kind,
+    //                 text: a.getText().slice(0, 100),
+    //             }
+    //         })
+    //     )
+    // }
+
     function visit(node: ts.Node, module: string, nsStack: string[]) {
+        let nextVisit = true
         mainIf: if (ts.isBinaryExpression(node) && node.operatorToken.kind == SyntaxKind.EqualsToken) {
             const name = node.left.getText()
             if (node.right.getChildCount() == 4 && node.right.getChildren()[0].getText().includes('extend')) {
@@ -226,50 +301,100 @@ async function getTypeInjects() {
                             // )
                             break mainIf
                         }
+                        const varTable: Map<string, string> = new Map()
                         for (let i = 0; i < argNames.length; i++) {
-                            typeInjects.push({
+                            varTable.set(argNames[i], type.args[i].name)
+                        }
+
+                        for (let i = 0; i < argNames.length; i++) {
+                            const to: string = varTable.get(argNames[i])!
+                            changeQueue.push({
+                                operation: 'rename',
+                                from: argNames[i],
+                                to: to,
+                                pos: right.parameters[i].getStart(),
+                            })
+                            changeQueue.push({
+                                operation: 'inject',
                                 type: type.args[i].type,
                                 pos: right.parameters[i].end,
                             })
                         }
 
-                        const varTable: Record<string, string> = {}
-                        for (let i = 0; i < argNames.length; i++) {
-                            varTable[argNames[i]] = type.args[i].name
-                        }
-
                         for (const statement of right.body.statements) {
-                            functionVisit(statement, module, nsPath)
+                            functionVisit(statement, module, nsPath, varTable)
                         }
+                        nextVisit = false
                     }
                 } else {
                     const type: Field = varList.fields[name]
                     if (type) {
-                        typeInjects.push({ type: type.type, pos: node.name!.end })
+                        const indentStyle: IndentStyle = typedefModulesIndentStyles[module]
+                        const sp = type.type.split('\n')
+                        const indents: number[] = sp.map(line => getIndentCountOfLine(indentStyle, line))
+                        let minIndent = 9999
+                        for (let i = 1; i < indents.length; i++) minIndent = Math.min(minIndent, indents[i])
+                        for (let i = 1; i < indents.length; i++) indents[i] -= minIndent
+
+                        const { line } = ts.getLineAndCharacterOfPosition(node.getSourceFile(), node.getStart())
+                        const baseIndent = getIndentCountOfLine(gameCompiledIndentStyle, gameCompiledSplit[line])
+                        for (let i = 1; i < indents.length; i++) indents[i] += baseIndent
+                        indents[indents.length - 1] = baseIndent
+
+                        for (let i = 1; i < sp.length; i++) {
+                            sp[i] = getIndentX(gameCompiledIndentStyle, indents[i]) + sp[i].trim()
+                        }
+
+                        const typeStr = sp.join('\n')
+                        changeQueue.push({ operation: 'inject', type: typeStr, pos: node.name!.end })
                     }
                 }
             }
+        } else if (ts.isFunctionExpression(node)) {
+            nextVisit = false
         }
-        ts.forEachChild(node, node => visit(node, module, [...nsStack]))
+        if (nextVisit) ts.forEachChild(node, node => visit(node, module, [...nsStack]))
     }
 
-    function functionVisit(node: ts.Node, module: string, nsPath: string) {}
+    function functionVisit(node: ts.Node, module: string, nsPath: string, varTable: Map<string, string>) {
+        if (ts.isIdentifier(node)) {
+            const name = node.getText()
+            if (varTable.has(name)) {
+                changeQueue.push({
+                    operation: 'rename',
+                    from: name,
+                    to: varTable.get(name)!,
+                    pos: node.getStart(),
+                })
+            }
+        }
+        ts.forEachChild(node, node => functionVisit(node, module, nsPath, varTable))
+    }
 }
 await getTypeInjects()
 
 async function injectIntoGameCompiled() {
-    let code = (await fs.promises.readFile(gameCompiledPath, 'utf8')).split('')
+    console.log('modifing code...')
+    const code = await fs.promises.readFile(gameCompiledPath, 'utf8')
 
-    let offset = 0
-    for (let { pos, type } of typeInjects) {
-        const str = ` /* ${type} */`
-        pos += offset
+    const res: string[] = []
+    let i = 0
+    for (let obj of changeQueue) {
+        res.push(code.slice(i, obj.pos))
+        i = obj.pos
 
-        code.splice(pos, 0, ...str.split(''))
-
-        offset += str.length
+        if (obj.operation == 'inject') {
+            const str = ` /* ${obj.type} */`
+            res.push(str)
+        } else if (obj.operation == 'rename') {
+            res.push(obj.to)
+            i += obj.from.length
+        } else assert(false)
     }
+    res.push(code.slice(i, code.length))
 
-    await fs.promises.writeFile(outGameCompiledPath, code.join(''), 'utf8')
+    await fs.promises.writeFile(outGameCompiledPath, res.join(''), 'utf8')
 }
 await injectIntoGameCompiled()
+console.log('all done')
+console.log('result saved into', outGameCompiledPath)
