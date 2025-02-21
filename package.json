@@ -1,12 +1,11 @@
 {
-  "name": "crosscode-typedef-inserter",
-  "module": "index.ts",
-  "type": "module",
-  "devDependencies": {
-    "@types/bun": "latest"
-  },
-  "peerDependencies": {
-    "typescript": "^5.0.0"
-  }
+    "name": "crosscode-typedef-inserter",
+    "module": "index.ts",
+    "type": "module",
+    "devDependencies": {
+        "@types/bun": "latest"
+    },
+    "dependencies": {
+        "typescript": "^5.0.0"
+    }
 }
-
