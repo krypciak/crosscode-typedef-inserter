@@ -1,6 +1,6 @@
 const typedefRepoPath: string = './ultimate-crosscode-typedefs'
 const gameCompiledPath: string = './game.compiled.js'
-// const outGameCompiledPath: string = './game.compiled.typed.js'
+const outGameCompiledPath: string = './game.compiled.typed.js'
 const outTypesPath: string = './typedefs.json'
 
 export function assert(v: any, msg?: string): asserts v {
@@ -9,6 +9,7 @@ export function assert(v: any, msg?: string): asserts v {
 import ts, { SyntaxKind } from 'typescript'
 import * as fs from 'fs'
 import * as path from 'path'
+import { contains } from 'jquery'
 
 const fileExists = async (path: string) => !!(await fs.promises.stat(path).catch(_ => false))
 
@@ -134,7 +135,8 @@ async function getModulesInfo(force: boolean = false) {
 }
 await getModulesInfo(false)
 
-async function injectIntoGame() {
+const typeInjects: { pos: number; type: string }[] = []
+async function getTypeInjects() {
     const program = ts.createProgram([gameCompiledPath], {
         target: ts.ScriptTarget.ES5,
         module: ts.ModuleKind.CommonJS,
@@ -172,12 +174,11 @@ async function injectIntoGame() {
                     assert(ts.isFunctionExpression(func))
                     const innerSyntaxList = func.body.getChildren()[1]
                     assert(innerSyntaxList.kind == 352)
-                    if (module == 'impact.base.image') {
-                        console.log(module)
+                    if (true || module == 'impact.base.image') {
+                        // console.log(module)
                         for (const child of innerSyntaxList.getChildren()) {
                             visit(child, module, [])
                         }
-                        process.exit(0)
                     }
                 }
             }
@@ -196,8 +197,7 @@ async function injectIntoGame() {
         )
     }
     function visit(node: ts.Node, module: string, nsStack: string[]) {
-        if (ts.isBinaryExpression(node) && node.operatorToken.kind == SyntaxKind.EqualsToken) {
-            // print(node)
+        mainIf: if (ts.isBinaryExpression(node) && node.operatorToken.kind == SyntaxKind.EqualsToken) {
             const name = node.left.getText()
             if (node.right.getChildCount() == 4 && node.right.getChildren()[0].getText().includes('extend')) {
                 nsStack.push(name)
@@ -212,19 +212,64 @@ async function injectIntoGame() {
                 if (ts.isFunctionExpression(right)) {
                     const type: Function = varList.functions[name]
                     if (type) {
+                        const argNames = right.parameters.map(a => a.name.getText())
+                        if (argNames.length != type.args.length) {
+                            // console.warn(
+                            //     `module: \u001b[32m${module}\u001b[0m` +
+                            //         `, function \u001b[32m${nsPath}#${name}\u001b[0m` +
+                            //         ` argument count mismatch!\n` +
+                            //         `game.compiled.js: [${argNames.map(a => `\u001b[32m${a}\u001b[0m`).join(', ')}]\n` +
+                            //         `typedefs: [${type.args
+                            //             .map(a => a.name + ': ' + a.type)
+                            //             .map(a => `\u001b[32m${a}\u001b[0m`)
+                            //             .join(', ')}]\n`
+                            // )
+                            break mainIf
+                        }
+                        for (let i = 0; i < argNames.length; i++) {
+                            typeInjects.push({
+                                type: type.args[i].type,
+                                pos: right.parameters[i].end,
+                            })
+                        }
+
+                        const varTable: Record<string, string> = {}
+                        for (let i = 0; i < argNames.length; i++) {
+                            varTable[argNames[i]] = type.args[i].name
+                        }
+
+                        for (const statement of right.body.statements) {
+                            functionVisit(statement, module, nsPath)
+                        }
                     }
                 } else {
                     const type: Field = varList.fields[name]
                     if (type) {
-                        // console.log(nsPath, right.kind)
-                        // print(right)
-
-                        console.log(name, "has the type", type.type)
+                        typeInjects.push({ type: type.type, pos: node.name!.end })
                     }
                 }
             }
         }
         ts.forEachChild(node, node => visit(node, module, [...nsStack]))
     }
+
+    function functionVisit(node: ts.Node, module: string, nsPath: string) {}
 }
-await injectIntoGame()
+await getTypeInjects()
+
+async function injectIntoGameCompiled() {
+    let code = (await fs.promises.readFile(gameCompiledPath, 'utf8')).split('')
+
+    let offset = 0
+    for (let { pos, type } of typeInjects) {
+        const str = ` /* ${type} */`
+        pos += offset
+
+        code.splice(pos, 0, ...str.split(''))
+
+        offset += str.length
+    }
+
+    await fs.promises.writeFile(outGameCompiledPath, code.join(''), 'utf8')
+}
+await injectIntoGameCompiled()
