@@ -2,3 +2,4 @@ node_modules
 ultimate-crosscode-typedefs
 typedefs.json
 game.compiled.*
+.env

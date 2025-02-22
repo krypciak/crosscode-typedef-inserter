@@ -1,14 +1,17 @@
-const typedefRepoPath: string = './ultimate-crosscode-typedefs'
-const gameCompiledPath: string = './game.compiled.js'
-const outGameCompiledPath: string = './game.compiled.typed.js'
-const outTypesPath: string = './typedefs.json'
-
 export function assert(v: any, msg?: string): asserts v {
     if (!v) throw new Error(`Assertion error${msg ? `: ${msg}` : ''}`)
 }
 import ts, { SyntaxKind } from 'typescript'
 import * as fs from 'fs'
 import * as path from 'path'
+
+const typedefRepoPath = process.env['TYPEDEF_REPO']!
+const gameCompiledPath = process.env['GAME_COMPILED_JS']!
+const outGameCompiledPath = process.env['OUTPUT_GAME_COMPILED_JS']!
+assert(typedefRepoPath, 'TYPEDEF_REPO enviroment variable not set!')
+assert(gameCompiledPath, 'GAME_COMPILED_JS enviroment variable not set!')
+assert(outGameCompiledPath, 'OUTPUT_GAME_COMPILED_JS enviroment variable not set!')
+const outTypesPath: string = './typedefs.json'
 
 const fileExists = async (path: string) => !!(await fs.promises.stat(path).catch(_ => false))
 
@@ -118,6 +121,11 @@ for (const module of typedefModuleList) typedefModuleRecord[module] = {}
 //         })
 //     )
 // }
+declare global {
+    interface Array<T> {
+        last(): T
+    }
+}
 Array.prototype.last = function (this: []) {
     return this[this.length - 1]
 }
