@@ -198,10 +198,11 @@ async function getModulesInfo(force: boolean = false) {
         } else if (ts.isMethodSignature(node)) {
             const name = node.name.getText()
             const returnType = getTypeFullName(node.type!.getText(), nsStack)
-            const args = node.parameters.slice(1).map(a => ({
+            const args = node.parameters.map(a => ({
                 name: a.name.getText(),
                 type: getTypeFullName(a.type?.getText() ?? 'unknown', nsStack),
             }))
+            if (args.length > 0 && args[0].type == 'this') args.splice(0, 1)
             const nsPath = nsStack.join('.')
             typedefModuleRecord[module][nsPath] ??= defVarList()
             typedefModuleRecord[module][nsPath].functions[name] = { returnType, args }
@@ -219,8 +220,8 @@ async function getModulesInfo(force: boolean = false) {
         ts.forEachChild(node, node => visit(module, node, [...nsStack]))
     }
 }
-await getModulesInfo(false)
-
+await getModulesInfo(true)
+console.dir(typedefModuleRecord['impact.base.coll-entry']['ig.CollTools'], { depth: null })
 // prettier-ignore
 const changeQueue: ({ pos: number } & (
     { operation: 'inject'; type: string } |
@@ -282,6 +283,14 @@ async function getTypeInjects() {
         mainIf: if (ts.isBinaryExpression(node) && node.operatorToken.kind == SyntaxKind.EqualsToken) {
             const name = node.left.getText()
             if (node.right.getChildCount() == 4 && node.right.getChildren()[0].getText().includes('extend')) {
+                // class extend
+                nsStack.push(name)
+            } else if (
+                node.right.getChildCount() == 3 &&
+                node.right.getChildren()[0].kind == 19 &&
+                node.right.getChildren()[2].kind == 20
+            ) {
+                // function namespace
                 nsStack.push(name)
             }
         } else if (ts.isObjectLiteralElement(node)) {

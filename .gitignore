@@ -1,5 +1,4 @@
 node_modules
-game.compiled.js
 ultimate-crosscode-typedefs
 typedefs.json
-game.compiled.typed.js
+game.compiled.*
