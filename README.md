@@ -1,15 +1,15 @@
 # crosscode-typedef-inserter
 
-To install dependencies:
-
+Edit the `.env` file to include paths. An example `.env` can look like:  
 ```bash
-bun install
+TYPEDEF_REPO=./ultimate-crosscode-typedefs
+GAME_COMPILED_JS=./game.compiled.js
+OUTPUT_GAME_COMPILED_JS=./game.compiled.typed.js
 ```
 
-To run:
+Then run:  
 
 ```bash
-bun run index.ts
+npm install
+npm start
 ```
-
-This project was created using `bun init` in bun v1.2.2. [Bun](https://bun.sh) is a fast all-in-one JavaScript runtime.
