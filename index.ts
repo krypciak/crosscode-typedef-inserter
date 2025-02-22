@@ -220,8 +220,8 @@ async function getModulesInfo(force: boolean = false) {
         ts.forEachChild(node, node => visit(module, node, [...nsStack]))
     }
 }
-await getModulesInfo(true)
-console.dir(typedefModuleRecord['impact.base.coll-entry']['ig.CollTools'], { depth: null })
+await getModulesInfo(false)
+
 // prettier-ignore
 const changeQueue: ({ pos: number } & (
     { operation: 'inject'; type: string } |
@@ -278,6 +278,19 @@ async function getTypeInjects() {
         if (depth < 6) ts.forEachChild(node, node => rootVisit(node, depth + 1))
     }
 
+    function checkAndReplaceWithRecord(module: string, nsPath: string, type: Field) {
+        // check if is an enum
+        const varList: VarList = typedefModuleRecord[module][nsPath]
+        if (varList && Object.keys(varList.functions).length == 0 && Object.keys(varList.fields).length >= 2) {
+            const firstType = Object.values(varList.fields)[0].type
+            if (Object.values(varList.fields).every(a => a.type == firstType)) {
+                // enum
+                delete typedefModuleRecord[module][nsPath]
+                type.type = `Record<K, ${firstType}>`
+            }
+        }
+    }
+
     function visit(node: ts.Node, module: string, nsStack: string[]) {
         let nextVisit = true
         mainIf: if (ts.isBinaryExpression(node) && node.operatorToken.kind == SyntaxKind.EqualsToken) {
@@ -292,6 +305,16 @@ async function getTypeInjects() {
             ) {
                 // function namespace
                 nsStack.push(name)
+
+                const type: Field = { type: 'none' }
+                checkAndReplaceWithRecord(module, nsStack.join('.'), type)
+                if (type.type != 'none') {
+                    changeQueue.push({
+                        operation: 'inject',
+                        type: type.type,
+                        pos: node.right.getChildren()[0].getStart() - 1,
+                    })
+                }
             }
         } else if (ts.isObjectLiteralElement(node)) {
             const name = node.name!.getText()
@@ -347,6 +370,10 @@ async function getTypeInjects() {
                         nsStack.push(name)
                     }
                     const type: Field = varList.fields[name]
+                    if (ts.isObjectLiteralExpression(right)) {
+                        checkAndReplaceWithRecord(module, `${nsPath}.${name}`, type)
+                    }
+
                     if (type && (!ts.isObjectLiteralExpression(right) || !type.type.includes('{'))) {
                         const indentStyle: IndentStyle = typedefModulesIndentStyles[module]
                         const sp = type.type.split('\n')
