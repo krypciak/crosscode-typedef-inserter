@@ -1,5 +1,7 @@
 # crosscode-typedef-inserter
 
+### NOTE: This only adds types to code that is typed in [ultimate-crosscode-typedefs](https://github.com/krypciak/ultimate-crosscode-typedefs)! ([See coverage](https://github.com/krypciak/crosscode-typedef-percentage))
+
 | From | To |
 | ------| --------- |
 | ![image](https://github.com/user-attachments/assets/80a1c77d-f654-4f61-8e60-ea744dedaea3) |  ![image](https://github.com/user-attachments/assets/bdd75576-ea31-42cc-9f6a-b1976bdae1d3) |
