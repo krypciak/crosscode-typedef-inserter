@@ -108,6 +108,16 @@ const typedefModulesIndentStyles: Record<string, IndentStyle> = (
 let typedefModuleRecord: Record<string, Record<string, VarList>> = {}
 for (const module of typedefModuleList) typedefModuleRecord[module] = {}
 
+// function print(node: ts.Node) {
+//     console.log(
+//         node.getChildren().map(a => {
+//             return {
+//                 kind: a.kind,
+//                 text: a.getText().slice(0, 100),
+//             }
+//         })
+//     )
+// }
 Array.prototype.last = function (this: []) {
     return this[this.length - 1]
 }
@@ -155,6 +165,7 @@ async function getModulesInfo(force: boolean = false) {
     }
 
     function visit(module: string, node: ts.Node, nsStack: string[]) {
+        // console.log(node.kind, node.getText().slice(0, 30))
         if (ts.isModuleDeclaration(node)) {
             const name = node.name.text
             if (name != 'global') nsStack.push(name)
@@ -174,6 +185,13 @@ async function getModulesInfo(force: boolean = false) {
             const nsPath = nsStack.join('.')
             typedefModuleRecord[module][nsPath] ??= defVarList()
             typedefModuleRecord[module][nsPath].fields[name] = { type }
+
+            const right = node.getChildren()[2]
+            if (ts.isTypeLiteralNode(right)) {
+                if (right.getChildren()[0].kind == 19 && right.getChildren()[2].kind == 20) {
+                    nsStack.push(name)
+                }
+            }
         } else if (ts.isInterfaceDeclaration(node)) {
             const name = node.name.text
             nsStack.push(name)
@@ -259,17 +277,6 @@ async function getTypeInjects() {
         if (depth < 6) ts.forEachChild(node, node => rootVisit(node, depth + 1))
     }
 
-    // function print(node: ts.Node) {
-    //     console.log(
-    //         node.getChildren().map(a => {
-    //             return {
-    //                 kind: a.kind,
-    //                 text: a.getText().slice(0, 100),
-    //             }
-    //         })
-    //     )
-    // }
-
     function visit(node: ts.Node, module: string, nsStack: string[]) {
         let nextVisit = true
         mainIf: if (ts.isBinaryExpression(node) && node.operatorToken.kind == SyntaxKind.EqualsToken) {
@@ -327,8 +334,11 @@ async function getTypeInjects() {
                         nextVisit = false
                     }
                 } else {
+                    if (ts.isObjectLiteralExpression(right)) {
+                        nsStack.push(name)
+                    }
                     const type: Field = varList.fields[name]
-                    if (type) {
+                    if (type && (!ts.isObjectLiteralExpression(right) || !type.type.includes('{'))) {
                         const indentStyle: IndentStyle = typedefModulesIndentStyles[module]
                         const sp = type.type.split('\n')
                         const indents: number[] = sp.map(line => getIndentCountOfLine(indentStyle, line))
