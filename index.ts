@@ -18,12 +18,14 @@ const fileExists = async (path: string) => !!(await fs.promises.stat(path).catch
 type Type = string
 interface Field {
     type: Type
+    isOptional?: boolean
 }
 interface Function {
     returnType: string
     args: {
         name: string
         type: string
+        isOptional: boolean
     }[]
 }
 interface VarList {
@@ -192,7 +194,7 @@ async function getModulesInfo(force: boolean = false) {
             const type = getTypeFullName(node.type!.getText(), nsStack)
             const nsPath = nsStack.join('.')
             typedefModuleRecord[module][nsPath] ??= defVarList()
-            typedefModuleRecord[module][nsPath].fields[name] = { type }
+            typedefModuleRecord[module][nsPath].fields[name] = { type, isOptional: !!node.questionToken }
 
             const right = node.getChildren()[2]
             if (ts.isTypeLiteralNode(right)) {
@@ -206,12 +208,13 @@ async function getModulesInfo(force: boolean = false) {
         } else if (ts.isMethodSignature(node)) {
             const name = node.name.getText()
             const returnType = getTypeFullName(node.type!.getText(), nsStack)
-            const args = node.parameters.map(a => {
+            const args: Function['args'] = node.parameters.map(a => {
                 let name = a.name.getText()
                 if (name.length == 1) name = name + '_'
                 return {
                     name,
                     type: getTypeFullName(a.type?.getText() ?? 'unknown', nsStack),
+                    isOptional: !!a.questionToken,
                 }
             })
             if (args.length > 0 && args[0].type == 'this') args.splice(0, 1)
@@ -219,12 +222,13 @@ async function getModulesInfo(force: boolean = false) {
             typedefModuleRecord[module][nsPath] ??= defVarList()
             typedefModuleRecord[module][nsPath].functions[name] = { returnType, args }
         } else if (ts.isConstructSignatureDeclaration(node)) {
-            const args = node.parameters.map(a => {
+            const args: Function['args'] = node.parameters.map(a => {
                 let name = a.name.getText()
                 if (name.length == 1) name = name + '_'
                 return {
                     name,
                     type: getTypeFullName(a.type?.getText() ?? 'unknown', nsStack),
+                    isOptional: !!a.questionToken,
                 }
             })
 
@@ -240,7 +244,7 @@ await getModulesInfo(true)
 
 // prettier-ignore
 const changeQueue: ({ pos: number } & (
-    { operation: 'inject'; type: string } |
+    { operation: 'inject'; type: string, isOptional?: boolean } |
     { operation: 'rename'; from: string; to: string }
 ))[] = []
 
@@ -373,6 +377,7 @@ async function getTypeInjects() {
                                 operation: 'inject',
                                 type: type.args[i].type,
                                 pos: right.parameters[i].end,
+                                isOptional: type.args[i].isOptional,
                             })
                         }
                         changeQueue.push({
@@ -413,7 +418,12 @@ async function getTypeInjects() {
                         }
 
                         const typeStr = sp.join('\n')
-                        changeQueue.push({ operation: 'inject', type: typeStr, pos: node.name!.end })
+                        changeQueue.push({
+                            operation: 'inject',
+                            type: typeStr,
+                            pos: node.name!.end,
+                            isOptional: type.isOptional,
+                        })
                     }
                 }
             }
@@ -451,7 +461,7 @@ async function injectIntoGameCompiled() {
         i = obj.pos
 
         if (obj.operation == 'inject') {
-            const str = ` /* ${obj.type} */`
+            const str = `/*${obj.isOptional ? '?' : ''}: ${obj.type}*/`
             res.push(str)
         } else if (obj.operation == 'rename') {
             res.push(obj.to)
