@@ -375,6 +375,11 @@ async function getTypeInjects() {
                                 pos: right.parameters[i].end,
                             })
                         }
+                        changeQueue.push({
+                            operation: 'inject',
+                            type: type.returnType,
+                            pos: right.body.getStart() - 1,
+                        })
 
                         for (const statement of right.body.statements) {
                             functionVisit(statement, module, nsPath, varTable)
