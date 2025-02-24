@@ -206,19 +206,27 @@ async function getModulesInfo(force: boolean = false) {
         } else if (ts.isMethodSignature(node)) {
             const name = node.name.getText()
             const returnType = getTypeFullName(node.type!.getText(), nsStack)
-            const args = node.parameters.map(a => ({
-                name: a.name.getText(),
-                type: getTypeFullName(a.type?.getText() ?? 'unknown', nsStack),
-            }))
+            const args = node.parameters.map(a => {
+                let name = a.name.getText()
+                if (name.length == 1) name = name + '_'
+                return {
+                    name,
+                    type: getTypeFullName(a.type?.getText() ?? 'unknown', nsStack),
+                }
+            })
             if (args.length > 0 && args[0].type == 'this') args.splice(0, 1)
             const nsPath = nsStack.join('.')
             typedefModuleRecord[module][nsPath] ??= defVarList()
             typedefModuleRecord[module][nsPath].functions[name] = { returnType, args }
         } else if (ts.isConstructSignatureDeclaration(node)) {
-            const args = node.parameters.map(a => ({
-                name: a.name.getText(),
-                type: getTypeFullName(a.type?.getText() ?? 'unknown', nsStack),
-            }))
+            const args = node.parameters.map(a => {
+                let name = a.name.getText()
+                if (name.length == 1) name = name + '_'
+                return {
+                    name,
+                    type: getTypeFullName(a.type?.getText() ?? 'unknown', nsStack),
+                }
+            })
 
             const returnType = getTypeFullName(node.type!.getText(), nsStack)
             const nsPath = [...nsStack.slice(0, -1), returnType].join('.')
@@ -228,7 +236,7 @@ async function getModulesInfo(force: boolean = false) {
         ts.forEachChild(node, node => visit(module, node, [...nsStack]))
     }
 }
-await getModulesInfo(false)
+await getModulesInfo(true)
 
 // prettier-ignore
 const changeQueue: ({ pos: number } & (
