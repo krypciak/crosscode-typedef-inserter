@@ -434,18 +434,45 @@ async function getTypeInjects() {
     }
 
     function functionVisit(node: ts.Node, module: string, nsPath: string, varTable: Map<string, string>) {
-        if (ts.isIdentifier(node)) {
-            const name = node.getText()
+        let childOffset = 0
+        if (ts.isPropertyAssignment(node)) {
+            const child1 = node.getChildren()[0]
+            assert(ts.isIdentifier(child1))
+            const name = child1.getText()
             if (varTable.has(name)) {
-                changeQueue.push({
-                    operation: 'rename',
-                    from: name,
-                    to: varTable.get(name)!,
-                    pos: node.getStart(),
-                })
+                // console.log(node.kind + ' ' + node.getText().slice(0, 30))
+                // print(node)
+                childOffset = 1
             }
         }
-        ts.forEachChild(node, node => functionVisit(node, module, nsPath, varTable))
+        if (ts.isPropertyAccessExpression(node)) {
+        } else if (ts.isIdentifier(node)) {
+            let rename = true
+            if (ts.isPropertyAccessExpression(node.parent)) {
+                let topParent = node.parent
+                while (true) {
+                    if (ts.isPropertyAccessExpression(topParent.parent)) {
+                        topParent = topParent.parent
+                    } else break
+                }
+                const sp = topParent.getText().split('.')
+                if (sp[0] != node.getText()) rename = false
+            }
+            if (rename) {
+                const name = node.getText()
+                if (varTable.has(name)) {
+                    changeQueue.push({
+                        operation: 'rename',
+                        from: name,
+                        to: varTable.get(name)!,
+                        pos: node.getStart(),
+                    })
+                }
+            }
+        }
+        node.getChildren()
+            .slice(childOffset)
+            .forEach(node => functionVisit(node, module, nsPath, varTable))
     }
 }
 await getTypeInjects()
