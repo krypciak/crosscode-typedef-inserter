@@ -447,20 +447,23 @@ async function getTypeInjects() {
         }
         if (ts.isPropertyAccessExpression(node)) {
         } else if (ts.isIdentifier(node)) {
-            let rename = true
-            if (ts.isPropertyAccessExpression(node.parent)) {
-                let topParent = node.parent
-                while (true) {
-                    if (ts.isPropertyAccessExpression(topParent.parent)) {
-                        topParent = topParent.parent
-                    } else break
+            const name = node.getText()
+            if (varTable.has(name)) {
+                let rename = true
+                if (ts.isPropertyAccessExpression(node.parent)) {
+                    let topParent = node.parent
+                    while (true) {
+                        if (ts.isPropertyAccessExpression(topParent.parent)) {
+                            topParent = topParent.parent
+                        } else break
+                    }
+                    const sp = topParent
+                        .getText()
+                        .split('.')
+                        .map(a => a.trim())
+                    if (sp[0] != node.getText()) rename = false
                 }
-                const sp = topParent.getText().split('.')
-                if (sp[0] != node.getText()) rename = false
-            }
-            if (rename) {
-                const name = node.getText()
-                if (varTable.has(name)) {
+                if (rename) {
                     changeQueue.push({
                         operation: 'rename',
                         from: name,
