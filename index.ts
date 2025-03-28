@@ -31,11 +31,14 @@ interface Function {
 interface VarList {
     fields: Record<string, Field>
     functions: Record<string, Function>
+
+    parents: string[]
 }
 function defVarList(): VarList {
     return {
         fields: {},
         functions: {},
+        parents: [],
     }
 }
 
@@ -112,6 +115,8 @@ const typedefModulesIndentStyles: Record<string, IndentStyle> = (
 
 let typedefModuleRecord: Record<string, Record<string, VarList>> = {}
 for (const module of typedefModuleList) typedefModuleRecord[module] = {}
+
+const classPathToModule: Record<string, string> = {}
 
 // function print(node: ts.Node) {
 //     console.log(
@@ -205,6 +210,16 @@ async function getModulesInfo(force: boolean = false) {
         } else if (ts.isInterfaceDeclaration(node)) {
             const name = node.name.text
             nsStack.push(name)
+            const nsPath = nsStack.join('.')
+            classPathToModule[nsPath] = module
+            if (node.heritageClauses && node.heritageClauses.length > 0) {
+                for (const type of node.heritageClauses![0].types) {
+                    const typeStr = type.getText()
+                    if (typeStr.startsWith('ImpactClass')) continue
+                    typedefModuleRecord[module][nsPath] ??= defVarList()
+                    typedefModuleRecord[module][nsPath].parents.push(typeStr)
+                }
+            }
         } else if (ts.isMethodSignature(node)) {
             const name = node.name.getText()
             const returnType = getTypeFullName(node.type!.getText(), nsStack)
@@ -311,6 +326,30 @@ async function getTypeInjects() {
         }
     }
 
+    function getFromVarListRecursive<T extends 'functions' | 'fields'>(
+        varList: VarList,
+        type: T,
+        name: string,
+        depth = 0
+    ): VarList[T][string] | undefined {
+        if (depth >= 100) throw new Error('depth limit!')
+        if (varList[type][name]) return varList[type][name] as any
+        for (const parentPath of varList.parents) {
+            if (!parentPath || parentPath == 'ig.Class' || parentPath == 'ig.Config') continue
+            const module = classPathToModule[parentPath]
+            if (!module) break
+            const newVarList = typedefModuleRecord[module][parentPath]
+            const ret = getFromVarListRecursive(newVarList, type, name, depth + 1)
+            if (ret) return ret
+        }
+    }
+    function getFunction(varList: VarList, name: string): Function | undefined {
+        return getFromVarListRecursive(varList, 'functions', name)
+    }
+    function getField(varList: VarList, name: string): Field | undefined {
+        return getFromVarListRecursive(varList, 'fields', name)
+    }
+
     function visit(node: ts.Node, module: string, nsStack: string[]) {
         let nextVisit = true
         mainIf: if (ts.isBinaryExpression(node) && node.operatorToken.kind == SyntaxKind.EqualsToken) {
@@ -344,10 +383,10 @@ async function getTypeInjects() {
                 const right = node.getChildren()[2]
 
                 if (ts.isFunctionExpression(right)) {
-                    const type: Function = varList.functions[name]
+                    const type = getFunction(varList, name)
                     if (type) {
                         const argNames = right.parameters.map(a => a.name.getText())
-                        if (argNames.length != type.args.length) {
+                        if (argNames.length != type.args.length && name != 'modelChanged') {
                             // console.warn(
                             //     `module: \u001b[32m${module}\u001b[0m` +
                             //         `, function \u001b[32m${nsPath}#${name}\u001b[0m` +
@@ -395,8 +434,8 @@ async function getTypeInjects() {
                     if (ts.isObjectLiteralExpression(right)) {
                         nsStack.push(name)
                     }
-                    const type: Field = varList.fields[name]
-                    if (ts.isObjectLiteralExpression(right)) {
+                    const type = getField(varList, name)
+                    if (type && ts.isObjectLiteralExpression(right)) {
                         checkAndReplaceWithRecord(module, `${nsPath}.${name}`, type)
                     }
 
