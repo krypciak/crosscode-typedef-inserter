@@ -8,8 +8,8 @@
     "dependencies": {
         "@types/bun": "^1.2.3",
         "bun": "^1.2.3",
-        "typescript": "^5.0.0",
-        "lebab": "^3.2.6"
+        "lebab": "^3.2.6",
+        "typescript": "^5.0.0"
     },
     "pnpm": {
         "onlyBuiltDependencies": ["bun"]
