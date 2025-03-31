@@ -2,18 +2,53 @@ export function assert(v: any, msg?: string): asserts v {
     if (!v) throw new Error(`Assertion error${msg ? `: ${msg}` : ''}`)
 }
 import ts, { SyntaxKind } from 'typescript'
+// @ts-expect-error
+import * as lebab from 'lebab'
 import * as fs from 'fs'
 import * as path from 'path'
+const fileExists = async (path: string) => !!(await fs.promises.stat(path).catch(_ => false))
 
 const typedefRepoPath = process.env['TYPEDEF_REPO']!
-const gameCompiledPath = process.env['GAME_COMPILED_JS']!
+let gameCompiledPath = process.env['GAME_COMPILED_JS']!
 const outGameCompiledPath = process.env['OUTPUT_GAME_COMPILED_JS']!
 assert(typedefRepoPath, 'TYPEDEF_REPO enviroment variable not set!')
 assert(gameCompiledPath, 'GAME_COMPILED_JS enviroment variable not set!')
 assert(outGameCompiledPath, 'OUTPUT_GAME_COMPILED_JS enviroment variable not set!')
 const outTypesPath: string = './typedefs.json'
 
-const fileExists = async (path: string) => !!(await fs.promises.stat(path).catch(_ => false))
+async function applyLebab() {
+    const outPath = './game.compiled.lebab.js'
+    if (!fileExists(outPath)) {
+        console.log('running lebab...')
+        const orig = await fs.promises.readFile(gameCompiledPath, 'utf8')
+        let { code }: { code: string; warnings: { type: string; line: number; msg: string }[] } = lebab.transform(
+            orig,
+            [
+                // 'class',
+                'template',
+                'arrow',
+                'arrow-return',
+                'let',
+                'default-param',
+                // 'destruct-param',
+                'arg-spread',
+                'arg-rest',
+                'obj-method',
+                'obj-shorthand',
+                // 'no-strict',
+                // 'commonjs',
+                'exponent',
+                'multi-var',
+                'for-of',
+                // 'for-each',
+                'includes',
+            ]
+        )
+        await fs.promises.writeFile(outPath, code, 'utf8')
+    }
+    gameCompiledPath = outPath
+}
+await applyLebab()
 
 type Type = string
 interface Field {
@@ -29,15 +64,15 @@ interface Function {
     }[]
 }
 interface VarList {
-    fields: Record<string, Field>
-    functions: Record<string, Function>
+    fields: Map<string, Field>
+    functions: Map<string, Function>
 
     parents: string[]
 }
 function defVarList(): VarList {
     return {
-        fields: {},
-        functions: {},
+        fields: new Map(),
+        functions: new Map(),
         parents: [],
     }
 }
@@ -84,8 +119,8 @@ function getIndentCountOfLine(style: IndentStyle, line: string) {
     } else if (style == '4space') {
         for (let i = 0; i < line.length; i++)
             if (line[i] != ' ') {
-                assert((i / 4) % 1 == 0)
-                return i / 4
+                // if ((i / 4) % 1 == 0) console.warn(`non divisible by four: ${line}`)
+                return Math.ceil(i / 4)
             }
     }
     assert(false)
@@ -98,19 +133,13 @@ function getIndentX(style: IndentStyle, count: number) {
 
 const typedefModulesPath = `${typedefRepoPath}/modules`
 const typedefModuleList = (await fs.promises.readdir(typedefModulesPath)).map(a => a.slice(0, -5)).filter(Boolean)
-const typedefModulesIndentStyles: Record<string, IndentStyle> = (
+const typedefModulesIndentStyles: Map<string, IndentStyle> = new Map(
     await Promise.all(
         typedefModuleList.map(async module => {
             const str = await fs.promises.readFile(typedefModulesPath + '/' + module + '.d.ts', 'utf8')
-            return { module, indentStyle: getIndentStyleOfFile(str.split('\n')) }
+            return [module, getIndentStyleOfFile(str.split('\n'))] as [string, IndentStyle]
         })
     )
-).reduce(
-    (acc, { module, indentStyle }) => {
-        acc[module] = indentStyle
-        return acc
-    },
-    {} as Record<string, IndentStyle>
 )
 
 let typedefModuleRecord: Record<string, Record<string, VarList>> = {}
@@ -193,13 +222,13 @@ async function getModulesInfo(force: boolean = false) {
             const type = getTypeFullName(node.type!.getText(), nsStack)
             const nsPath = nsStack.join('.')
             typedefModuleRecord[module][nsPath] ??= defVarList()
-            typedefModuleRecord[module][nsPath].fields[name] = { type }
+            typedefModuleRecord[module][nsPath].fields.set(name, { type })
         } else if (ts.isPropertySignature(node)) {
             const name = node.name.getText()
             const type = getTypeFullName(node.type!.getText(), nsStack)
             const nsPath = nsStack.join('.')
             typedefModuleRecord[module][nsPath] ??= defVarList()
-            typedefModuleRecord[module][nsPath].fields[name] = { type, isOptional: !!node.questionToken }
+            typedefModuleRecord[module][nsPath].fields.set(name, { type, isOptional: !!node.questionToken })
 
             const right = node.getChildren()[2]
             if (ts.isTypeLiteralNode(right)) {
@@ -235,7 +264,7 @@ async function getModulesInfo(force: boolean = false) {
             if (args.length > 0 && args[0].type == 'this') args.splice(0, 1)
             const nsPath = nsStack.join('.')
             typedefModuleRecord[module][nsPath] ??= defVarList()
-            typedefModuleRecord[module][nsPath].functions[name] = { returnType, args }
+            typedefModuleRecord[module][nsPath].functions.set(name, { returnType, args })
         } else if (ts.isConstructSignatureDeclaration(node)) {
             const args: Function['args'] = node.parameters.map(a => {
                 let name = a.name.getText()
@@ -250,7 +279,7 @@ async function getModulesInfo(force: boolean = false) {
             const returnType = getTypeFullName(node.type!.getText(), nsStack)
             const nsPath = [...nsStack.slice(0, -1), returnType].join('.')
             typedefModuleRecord[module][nsPath] ??= defVarList()
-            typedefModuleRecord[module][nsPath].functions['init'] = { returnType, args }
+            typedefModuleRecord[module][nsPath].functions.set('init', { returnType, args })
         }
         ts.forEachChild(node, node => visit(module, node, [...nsStack]))
     }
@@ -301,7 +330,7 @@ async function getTypeInjects() {
                 const syntaxList = node.getChildren().find(a => a.kind == 352)
                 if (syntaxList) {
                     const func = syntaxList.getChildren()[0]
-                    assert(ts.isFunctionExpression(func))
+                    assert(ts.isFunctionExpression(func) || ts.isArrowFunction(func))
                     const innerSyntaxList = func.body.getChildren()[1]
                     assert(innerSyntaxList.kind == 352)
                     for (const child of innerSyntaxList.getChildren()) {
@@ -331,9 +360,9 @@ async function getTypeInjects() {
         type: T,
         name: string,
         depth = 0
-    ): VarList[T][string] | undefined {
+    ): ReturnType<VarList[T]['get']> | undefined {
         if (depth >= 100) throw new Error('depth limit!')
-        if (varList[type][name]) return varList[type][name] as any
+        if (varList[type].has(name)) return varList[type].get(name) as any
         for (const parentPath of varList.parents) {
             if (!parentPath || parentPath == 'ig.Class' || parentPath == 'ig.Config') continue
             const module = classPathToModule[parentPath]
@@ -380,9 +409,10 @@ async function getTypeInjects() {
             const nsPath = nsStack.join('.')
             const varList: VarList = typedefModuleRecord[module][nsPath]
             if (varList) {
-                const right = node.getChildren()[2]
+                let right = node.getChildren()[2]
+                if (ts.isMethodDeclaration(node)) right = node
 
-                if (ts.isFunctionExpression(right)) {
+                if (ts.isFunctionExpression(right) || ts.isMethodDeclaration(right)) {
                     const type = getFunction(varList, name)
                     if (type) {
                         const argNames = right.parameters.map(a => a.name.getText())
@@ -422,10 +452,10 @@ async function getTypeInjects() {
                         changeQueue.push({
                             operation: 'inject',
                             type: type.returnType,
-                            pos: right.body.getStart() - 1,
+                            pos: right.body!.getStart() - 1,
                         })
 
-                        for (const statement of right.body.statements) {
+                        for (const statement of right.body!.statements) {
                             functionVisit(statement, module, nsPath, varTable)
                         }
                         nextVisit = false
@@ -440,7 +470,7 @@ async function getTypeInjects() {
                     }
 
                     if (type && (!ts.isObjectLiteralExpression(right) || !type.type.includes('{'))) {
-                        const indentStyle: IndentStyle = typedefModulesIndentStyles[module]
+                        const indentStyle: IndentStyle = typedefModulesIndentStyles.get(module)!
                         const sp = type.type.split('\n')
                         const indents: number[] = sp.map(line => getIndentCountOfLine(indentStyle, line))
                         let minIndent = 9999
