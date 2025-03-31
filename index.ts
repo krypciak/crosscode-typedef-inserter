@@ -463,13 +463,14 @@ async function getTypeInjects() {
                         for (const statement of right.body!.statements) {
                             functionVisit(statement, module, nsPath, varTable)
                         }
-                        nextVisit = false
                     }
+                    nextVisit = false
                 } else {
                     if (ts.isObjectLiteralExpression(right)) {
                         nsStack.push(name)
                     }
                     const type = getField(varList, name)
+                    console.log(name, nsStack, ':', type)
                     if (type && ts.isObjectLiteralExpression(right)) {
                         checkAndReplaceWithRecord(module, `${nsPath}.${name}`, type)
                     }
@@ -501,7 +502,7 @@ async function getTypeInjects() {
                     }
                 }
             }
-        } else if (ts.isFunctionExpression(node)) {
+        } else if (ts.isFunctionExpression(node) || ts.isArrowFunction(node)) {
             nextVisit = false
         }
         if (nextVisit) ts.forEachChild(node, node => visit(node, module, [...nsStack]))
