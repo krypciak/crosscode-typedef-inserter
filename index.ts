@@ -470,7 +470,6 @@ async function getTypeInjects() {
                         nsStack.push(name)
                     }
                     const type = getField(varList, name)
-                    console.log(name, nsStack, ':', type)
                     if (type && ts.isObjectLiteralExpression(right)) {
                         checkAndReplaceWithRecord(module, `${nsPath}.${name}`, type)
                     }
