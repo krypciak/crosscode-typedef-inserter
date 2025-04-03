@@ -8,10 +8,12 @@
     "dependencies": {
         "@types/bun": "^1.2.3",
         "bun": "^1.2.3",
-        "lebab": "^3.2.6",
+        "lebab": "github:krypciak/lebab",
         "typescript": "^5.0.0"
     },
     "pnpm": {
-        "onlyBuiltDependencies": ["bun"]
+        "onlyBuiltDependencies": [
+            "bun"
+        ]
     }
 }
