@@ -297,6 +297,12 @@ const changeQueue: ({ pos: number } & (
     { operation: 'rename'; from: string; to: string }
 ))[] = []
 
+const typedStats = {
+    fields: { typed: 0, untyped: 0 },
+    functions: { typed: 0, untyped: 0 },
+    classes: { typed: 0, untyped: 0 },
+}
+
 async function getTypeInjects() {
     console.log('gathering all changes...')
     const gameCompiledSplit: string[] = (await fs.promises.readFile(gameCompiledPath, 'utf8')).split('\n')
@@ -384,13 +390,27 @@ async function getTypeInjects() {
         return getFromVarListRecursive(varList, 'fields', name)
     }
 
+    function isUnderClass(node: ts.Node): boolean {
+        const parent = node.parent.parent
+        if (ts.isCallExpression(parent)) {
+            if (parent.expression.getText().includes('extend')) {
+                return true
+            }
+        }
+        return false
+    }
+
     function visit(node: ts.Node, module: string, nsStack: string[]) {
         let nextVisit = true
-        mainIf: if (ts.isBinaryExpression(node) && node.operatorToken.kind == SyntaxKind.EqualsToken) {
+        if (ts.isBinaryExpression(node) && node.operatorToken.kind == SyntaxKind.EqualsToken) {
             const name = node.left.getText()
             if (node.right.getChildCount() == 4 && node.right.getChildren()[0].getText().includes('extend')) {
                 // class extend
                 nsStack.push(name)
+
+                const nsPath = nsStack.join('.')
+                const varList: VarList = typedefModuleRecord[module][nsPath]
+                typedStats.classes[varList ? 'typed' : 'untyped']++
             } else if (
                 node.right.getChildCount() == 3 &&
                 node.right.getChildren()[0].kind == 19 &&
@@ -412,34 +432,27 @@ async function getTypeInjects() {
         } else if (ts.isObjectLiteralElement(node)) {
             const name = node.name!.getText()
             const nsPath = nsStack.join('.')
-            const varList: VarList = typedefModuleRecord[module][nsPath]
-            if (varList) {
-                let right = node.getChildren()[2]
-                if (ts.isMethodDeclaration(node)) right = node
 
-                if (ts.isFunctionExpression(right) || ts.isMethodDeclaration(right)) {
+            let right = node.getChildren()[2]
+            if (ts.isMethodDeclaration(node)) right = node
+
+            const varList: VarList = typedefModuleRecord[module][nsPath]
+
+            if (ts.isFunctionExpression(right) || ts.isMethodDeclaration(right)) {
+                if (!varList) {
+                    typedStats.functions.untyped++
+                } else {
                     const type = getFunction(varList, name)
+                    typedStats.functions[type ? 'typed' : 'untyped']++
                     if (type) {
                         const argNames = right.parameters.map(a => a.name.getText())
-                        if (argNames.length != type.args.length && name != 'modelChanged') {
-                            // console.warn(
-                            //     `module: \u001b[32m${module}\u001b[0m` +
-                            //         `, function \u001b[32m${nsPath}#${name}\u001b[0m` +
-                            //         ` argument count mismatch!\n` +
-                            //         `game.compiled.js: [${argNames.map(a => `\u001b[32m${a}\u001b[0m`).join(', ')}]\n` +
-                            //         `typedefs: [${type.args
-                            //             .map(a => a.name + ': ' + a.type)
-                            //             .map(a => `\u001b[32m${a}\u001b[0m`)
-                            //             .join(', ')}]\n`
-                            // )
-                            break mainIf
-                        }
+                        const len = Math.min(argNames.length, type.args.length)
                         const varTable: Map<string, string> = new Map()
-                        for (let i = 0; i < argNames.length; i++) {
+                        for (let i = 0; i < len; i++) {
                             varTable.set(argNames[i], type.args[i].name)
                         }
 
-                        for (let i = 0; i < argNames.length; i++) {
+                        for (let i = 0; i < len; i++) {
                             const to: string = varTable.get(argNames[i])!
                             changeQueue.push({
                                 operation: 'rename',
@@ -465,11 +478,19 @@ async function getTypeInjects() {
                         }
                     }
                     nextVisit = false
+                }
+            } else {
+                if (!varList) {
+                    if (isUnderClass(node)) typedStats.fields.untyped++
                 } else {
                     if (ts.isObjectLiteralExpression(right)) {
                         nsStack.push(name)
                     }
                     const type = getField(varList, name)
+                    if (isUnderClass(node)) {
+                        typedStats.fields[type ? 'typed' : 'untyped']++
+                    }
+
                     if (type && ts.isObjectLiteralExpression(right)) {
                         checkAndReplaceWithRecord(module, `${nsPath}.${name}`, type)
                     }
@@ -577,5 +598,6 @@ async function injectIntoGameCompiled() {
     await fs.promises.writeFile(outGameCompiledPath, res.join(''), 'utf8')
 }
 await injectIntoGameCompiled()
+console.log(typedStats)
 console.log('all done')
 console.log('result saved into', outGameCompiledPath)

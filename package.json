@@ -14,6 +14,9 @@
     "pnpm": {
         "onlyBuiltDependencies": [
             "bun"
-        ]
+        ],
+        "overrides": {
+            "lebab": "link:../../../../.local/share/pnpm/global/5/node_modules/lebab"
+        }
     }
 }
