@@ -284,9 +284,13 @@ async function getModulesInfo(force: boolean = false) {
                 }
             })
 
-            // todo fix sc.sc.PlayerConfig
             const returnType = getTypeFullName(node.type!.getText(), nsStack)
-            const nsPath = [...nsStack.slice(0, -1), returnType].join('.')
+            let nsPath: string
+            if (returnType.startsWith('ig.') || returnType.startsWith('sc.')) {
+                nsPath = returnType
+            } else {
+                nsPath = [...nsStack.slice(0, -1), returnType].join('.')
+            }
             typedefModuleRecord[module][nsPath] ??= defVarList()
             typedefModuleRecord[module][nsPath].functions.set('init', { returnType, args })
         }
