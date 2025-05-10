@@ -214,7 +214,6 @@ async function getModulesInfo(force: boolean = false) {
     }
 
     function visit(module: string, node: ts.Node, nsStack: string[]) {
-        // console.log(node.kind, node.getText().slice(0, 30))
         if (ts.isModuleDeclaration(node)) {
             const name = node.name.text
             if (name != 'global') nsStack.push(name)
@@ -242,16 +241,20 @@ async function getModulesInfo(force: boolean = false) {
                 }
             }
         } else if (ts.isInterfaceDeclaration(node)) {
-            const name = node.name.text
+            let name = node.name.text
+            if (name.endsWith('Constructor')) name = name.slice(0, -'Constructor'.length)
+            if (name.endsWith('_CONSTRUCTOR')) name = name.slice(0, -'_CONSTRUCTOR'.length)
+
             nsStack.push(name)
             const nsPath = nsStack.join('.')
             classPathToModule[nsPath] = module
             if (node.heritageClauses && node.heritageClauses.length > 0) {
                 for (const type of node.heritageClauses![0].types) {
                     const typeStr = type.getText()
-                    if (typeStr.startsWith('ImpactClass')) continue
                     typedefModuleRecord[module][nsPath] ??= defVarList()
-                    typedefModuleRecord[module][nsPath].parents.push(typeStr)
+                    if (!typeStr.startsWith('ImpactClass')) {
+                        typedefModuleRecord[module][nsPath].parents.push(typeStr)
+                    }
                 }
             }
         } else if (ts.isMethodSignature(node)) {
@@ -281,6 +284,7 @@ async function getModulesInfo(force: boolean = false) {
                 }
             })
 
+            // todo fix sc.sc.PlayerConfig
             const returnType = getTypeFullName(node.type!.getText(), nsStack)
             const nsPath = [...nsStack.slice(0, -1), returnType].join('.')
             typedefModuleRecord[module][nsPath] ??= defVarList()
@@ -401,6 +405,62 @@ async function getTypeInjects() {
     }
 
     function visit(node: ts.Node, module: string, nsStack: string[]) {
+        const injectIntoFunction = (
+            nsPath: string,
+            name: string,
+            right: ts.FunctionExpression | ts.MethodDeclaration | ts.ArrowFunction
+        ) => {
+            const varList: VarList = typedefModuleRecord[module][nsPath]
+
+            if (!varList) {
+                typedStats.functions.untyped++
+            } else {
+                const type = getFunction(varList, name)
+                typedStats.functions[type ? 'typed' : 'untyped']++
+                if (type) {
+                    const argNames = right.parameters.map(a => a.name.getText())
+                    const len = Math.min(argNames.length, type.args.length)
+                    const varTable: Map<string, string> = new Map()
+                    for (let i = 0; i < len; i++) {
+                        varTable.set(argNames[i], type.args[i].name)
+                    }
+
+                    for (let i = 0; i < len; i++) {
+                        const to: string = varTable.get(argNames[i])!
+                        changeQueue.push({
+                            operation: 'rename',
+                            from: argNames[i],
+                            to: to,
+                            pos: right.parameters[i].getStart(),
+                        })
+                        changeQueue.push({
+                            operation: 'inject',
+                            type: type.args[i].type,
+                            pos: right.parameters[i].end,
+                            isOptional: type.args[i].isOptional,
+                        })
+                    }
+                    changeQueue.push({
+                        operation: 'inject',
+                        type: type.returnType,
+                        pos: right.body!.getStart() - 1,
+                    })
+
+                    let body: ts.Block
+                    if (ts.isArrowFunction(right)) {
+                        if (!ts.isBlock(right.body)) return
+                        body = right.body
+                    } else {
+                        body = right.body!
+                    }
+                    for (const statement of body.statements) {
+                        functionVisit(statement, module, nsPath, varTable)
+                    }
+                }
+                nextVisit = false
+            }
+        }
+
         let nextVisit = true
         if (ts.isBinaryExpression(node) && node.operatorToken.kind == SyntaxKind.EqualsToken) {
             let name = node.left.getText()
@@ -429,6 +489,11 @@ async function getTypeInjects() {
                         pos: node.right.getChildren()[0].getStart() - 1,
                     })
                 }
+            } else if (ts.isFunctionExpression(node.right) || ts.isArrowFunction(node.right)) {
+                const ns = node.left.getText()
+                const sp = ns.split('.')
+                const name = sp.last()
+                injectIntoFunction(sp.slice(0, -1).join('.'), name, node.right)
             }
         } else if (ts.isObjectLiteralElement(node)) {
             const name = node.name!.getText()
@@ -440,46 +505,7 @@ async function getTypeInjects() {
             const varList: VarList = typedefModuleRecord[module][nsPath]
 
             if (ts.isFunctionExpression(right) || ts.isMethodDeclaration(right)) {
-                if (!varList) {
-                    typedStats.functions.untyped++
-                } else {
-                    const type = getFunction(varList, name)
-                    typedStats.functions[type ? 'typed' : 'untyped']++
-                    if (type) {
-                        const argNames = right.parameters.map(a => a.name.getText())
-                        const len = Math.min(argNames.length, type.args.length)
-                        const varTable: Map<string, string> = new Map()
-                        for (let i = 0; i < len; i++) {
-                            varTable.set(argNames[i], type.args[i].name)
-                        }
-
-                        for (let i = 0; i < len; i++) {
-                            const to: string = varTable.get(argNames[i])!
-                            changeQueue.push({
-                                operation: 'rename',
-                                from: argNames[i],
-                                to: to,
-                                pos: right.parameters[i].getStart(),
-                            })
-                            changeQueue.push({
-                                operation: 'inject',
-                                type: type.args[i].type,
-                                pos: right.parameters[i].end,
-                                isOptional: type.args[i].isOptional,
-                            })
-                        }
-                        changeQueue.push({
-                            operation: 'inject',
-                            type: type.returnType,
-                            pos: right.body!.getStart() - 1,
-                        })
-
-                        for (const statement of right.body!.statements) {
-                            functionVisit(statement, module, nsPath, varTable)
-                        }
-                    }
-                    nextVisit = false
-                }
+                injectIntoFunction(nsPath, name, right)
             } else {
                 if (!varList) {
                     if (isUnderClass(node)) typedStats.fields.untyped++
