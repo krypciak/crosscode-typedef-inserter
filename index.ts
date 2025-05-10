@@ -1,7 +1,7 @@
 export function assert(v: any, msg?: string): asserts v {
     if (!v) throw new Error(`Assertion error${msg ? `: ${msg}` : ''}`)
 }
-import ts, { SyntaxKind } from 'typescript'
+import ts, { SyntaxKind, type NodeArray } from 'typescript'
 import * as lebab from 'lebab'
 import * as fs from 'fs'
 import * as path from 'path'
@@ -452,14 +452,17 @@ async function getTypeInjects() {
                         pos: right.body!.getStart() - 1,
                     })
 
-                    let body: ts.Block
+                    let functionNodes: Iterable<ts.Node>
                     if (ts.isArrowFunction(right)) {
-                        if (!ts.isBlock(right.body)) return
-                        body = right.body
+                        if (!ts.isBlock(right.body)) {
+                            functionNodes = [right.body]
+                        } else {
+                            functionNodes = right.body.statements
+                        }
                     } else {
-                        body = right.body!
+                        functionNodes = right.body!.statements
                     }
-                    for (const statement of body.statements) {
+                    for (const statement of functionNodes) {
                         functionVisit(statement, module, nsPath, varTable)
                     }
                 }
