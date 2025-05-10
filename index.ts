@@ -424,6 +424,8 @@ async function getTypeInjects() {
                 if (type) {
                     const argNames = right.parameters.map(a => a.name.getText())
                     const len = Math.min(argNames.length, type.args.length)
+                    if (len != type.args.length && name == 'init') return
+
                     const varTable: Map<string, string> = new Map()
                     for (let i = 0; i < len; i++) {
                         varTable.set(argNames[i], type.args[i].name)
