@@ -403,8 +403,9 @@ async function getTypeInjects() {
     function visit(node: ts.Node, module: string, nsStack: string[]) {
         let nextVisit = true
         if (ts.isBinaryExpression(node) && node.operatorToken.kind == SyntaxKind.EqualsToken) {
-            const name = node.left.getText()
+            let name = node.left.getText()
             if (node.right.getChildCount() == 4 && node.right.getChildren()[0].getText().includes('extend')) {
+                if (name == 'sc.PROXY_TYPE.BALL') name = 'sc.BallInfo'
                 // class extend
                 nsStack.push(name)
 
