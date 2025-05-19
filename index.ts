@@ -1,7 +1,7 @@
 export function assert(v: any, msg?: string): asserts v {
     if (!v) throw new Error(`Assertion error${msg ? `: ${msg}` : ''}`)
 }
-import ts, { SyntaxKind, type NodeArray } from 'typescript'
+import ts, { SyntaxKind } from 'typescript'
 import * as lebab from 'lebab'
 import * as fs from 'fs'
 import * as path from 'path'
@@ -69,15 +69,15 @@ export interface Function {
     }[]
 }
 export interface VarList {
-    fields: Map<string, Field>
-    functions: Map<string, Function>
+    fields: Record<string, Field>
+    functions: Record<string, Function>
 
     parents: string[]
 }
 function defVarList(): VarList {
     return {
-        fields: new Map(),
-        functions: new Map(),
+        fields: {},
+        functions: {},
         parents: [],
     }
 }
@@ -226,13 +226,13 @@ async function getModulesInfo(force: boolean = false) {
             const type = getTypeFullName(node.type!.getText(), nsStack)
             const nsPath = nsStack.join('.')
             typedefModuleRecord[module][nsPath] ??= defVarList()
-            typedefModuleRecord[module][nsPath].fields.set(name, { type })
+            typedefModuleRecord[module][nsPath].fields[name] = { type }
         } else if (ts.isPropertySignature(node)) {
             const name = node.name.getText()
             const type = getTypeFullName(node.type!.getText(), nsStack)
             const nsPath = nsStack.join('.')
             typedefModuleRecord[module][nsPath] ??= defVarList()
-            typedefModuleRecord[module][nsPath].fields.set(name, { type, isOptional: !!node.questionToken })
+            typedefModuleRecord[module][nsPath].fields[name] = { type, isOptional: !!node.questionToken }
 
             const right = node.getChildren()[2]
             if (ts.isTypeLiteralNode(right)) {
@@ -272,7 +272,7 @@ async function getModulesInfo(force: boolean = false) {
             if (args.length > 0 && args[0].type == 'this') args.splice(0, 1)
             const nsPath = nsStack.join('.')
             typedefModuleRecord[module][nsPath] ??= defVarList()
-            typedefModuleRecord[module][nsPath].functions.set(name, { returnType, args })
+            typedefModuleRecord[module][nsPath].functions[name] = { returnType, args }
         } else if (ts.isConstructSignatureDeclaration(node)) {
             const args: Function['args'] = node.parameters.map(a => {
                 let name = a.name.getText()
@@ -292,7 +292,7 @@ async function getModulesInfo(force: boolean = false) {
                 nsPath = [...nsStack.slice(0, -1), returnType].join('.')
             }
             typedefModuleRecord[module][nsPath] ??= defVarList()
-            typedefModuleRecord[module][nsPath].functions.set('init', { returnType, args })
+            typedefModuleRecord[module][nsPath].functions['init'] = { returnType, args }
         }
         ts.forEachChild(node, node => visit(module, node, [...nsStack]))
     }
@@ -379,9 +379,9 @@ async function getTypeInjects() {
         type: T,
         name: string,
         depth = 0
-    ): ReturnType<VarList[T]['get']> | undefined {
+    ): VarList[T][any] | undefined {
         if (depth >= 100) throw new Error('depth limit!')
-        if (varList[type].has(name)) return varList[type].get(name) as any
+        if (varList[type][name]) return varList[type][name] as any
         for (const parentPath of varList.parents) {
             if (!parentPath || parentPath == 'ig.Class' || parentPath == 'ig.Config') continue
             const module = classPathToModule[parentPath]
