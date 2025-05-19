@@ -56,11 +56,11 @@ async function applyLebab() {
 await applyLebab()
 
 type Type = string
-interface Field {
+export interface Field {
     type: Type
     isOptional?: boolean
 }
-interface Function {
+export interface Function {
     returnType: string
     args: {
         name: string
@@ -68,7 +68,7 @@ interface Function {
         isOptional: boolean
     }[]
 }
-interface VarList {
+export interface VarList {
     fields: Map<string, Field>
     functions: Map<string, Function>
 
