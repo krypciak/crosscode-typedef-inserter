@@ -375,6 +375,7 @@ async function getTypeInjects() {
     }
 
     function getFromVarListRecursive<T extends 'functions' | 'fields'>(
+        nsPath: string,
         varList: VarList,
         type: T,
         name: string,
@@ -382,20 +383,23 @@ async function getTypeInjects() {
     ): VarList[T][any] | undefined {
         if (depth >= 100) throw new Error('depth limit!')
         if (varList[type][name]) return varList[type][name] as any
-        for (const parentPath of varList.parents) {
+        for (let parentPath of varList.parents) {
             if (!parentPath || parentPath == 'ig.Class' || parentPath == 'ig.Config') continue
+            if (!parentPath.startsWith('ig.') && !parentPath.startsWith('sc.')) {
+                parentPath = nsPath.substring(0, nsPath.lastIndexOf('.')) + '.' + parentPath
+            }
             const module = classPathToModule[parentPath]
-            if (!module) break
+            if (!module) continue
             const newVarList = typedefModuleRecord[module][parentPath]
-            const ret = getFromVarListRecursive(newVarList, type, name, depth + 1)
+            const ret = getFromVarListRecursive(parentPath, newVarList, type, name, depth + 1)
             if (ret) return ret
         }
     }
-    function getFunction(varList: VarList, name: string): Function | undefined {
-        return getFromVarListRecursive(varList, 'functions', name)
+    function getFunction(nsPath: string, varList: VarList, name: string): Function | undefined {
+        return getFromVarListRecursive(nsPath, varList, 'functions', name)
     }
-    function getField(varList: VarList, name: string): Field | undefined {
-        return getFromVarListRecursive(varList, 'fields', name)
+    function getField(nsPath: string, varList: VarList, name: string): Field | undefined {
+        return getFromVarListRecursive(nsPath, varList, 'fields', name)
     }
 
     function isUnderClass(node: ts.Node): boolean {
@@ -419,7 +423,7 @@ async function getTypeInjects() {
             if (!varList) {
                 typedStats.functions.untyped++
             } else {
-                const type = getFunction(varList, name)
+                const type = getFunction(nsPath, varList, name)
                 typedStats.functions[type ? 'typed' : 'untyped']++
                 if (type) {
                     const argNames = right.parameters.map(a => a.name.getText())
@@ -522,7 +526,7 @@ async function getTypeInjects() {
                     if (ts.isObjectLiteralExpression(right)) {
                         nsStack.push(name)
                     }
-                    const type = getField(varList, name)
+                    const type = getField(nsPath, varList, name)
                     if (isUnderClass(node)) {
                         typedStats.fields[type ? 'typed' : 'untyped']++
                     }
