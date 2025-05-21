@@ -269,7 +269,7 @@ async function getModulesInfo(force: boolean = false) {
                     isOptional: !!a.questionToken,
                 }
             })
-            if (args.length > 0 && args[0].type == 'this') args.splice(0, 1)
+            if (args.length > 0 && args[0].name == 'this') args.splice(0, 1)
             const nsPath = nsStack.join('.')
             typedefModuleRecord[module][nsPath] ??= defVarList()
             typedefModuleRecord[module][nsPath].functions[name] = { returnType, args }
