@@ -175,6 +175,7 @@ export async function getTypeInjectsAndTypedStats(
             const module = classPathToModule[parentPath]
             if (!module) continue
             const newVarList = typedefModuleRecord[module][parentPath]
+            if (!newVarList) continue
             const ret = getFromVarListRecursive(parentPath, newVarList, type, name, depth + 1)
             if (ret) return ret
         }
@@ -312,7 +313,7 @@ export async function getTypeInjectsAndTypedStats(
                     }
                     const type = getField(nsPath, varList, name)
                     if (isUnderClass(node)) {
-                        typedStats.fields[type ? 'typed' : 'untyped']++
+                        typedStats.fields[(type && type.type != 'unknown') ? 'typed' : 'untyped']++
                     }
 
                     if (type && ts.isObjectLiteralExpression(right)) {

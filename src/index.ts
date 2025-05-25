@@ -30,8 +30,22 @@ async function run() {
     )
 
     await injectIntoGameCompiled(gameCompiledPath, outGameCompiledPath, changeQueue)
-    console.log(typedStats)
+
     console.log('all done')
     console.log('result saved into', outGameCompiledPath)
+
+    const { typed: ct, untyped: cu } = typedStats.classes
+    const { typed: ft, untyped: fu } = typedStats.functions
+    const { typed: et, untyped: eu } = typedStats.fields
+    const cavg = 100 * (ct / (ct + cu))
+    const favg = 100 * (ft / (ft + fu))
+    const eavg = 100 * (et / (et + eu))
+    const text =
+        '\n' +
+        `classes: total: ${ct + cu}, typedefs: ${ct}, ${cavg.toFixed(2)}%\n` +
+        `functions: total: ${ft + fu}, typedefs: ${ft}, ${favg.toFixed(2)}%\n` +
+        `fields: total: ${et + eu}, typedefs: ${et}, ${eavg.toFixed(2)}%\n` +
+        `total (avg % of classes + fields + functions): ${((cavg + favg + eavg) / 3).toFixed(2)}%\n`
+    console.log(text)
 }
 await run()
