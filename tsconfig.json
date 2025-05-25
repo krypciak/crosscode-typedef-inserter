@@ -1,7 +1,7 @@
 {
   "exclude": [
     "ultimate-crosscode-typedefs",
-    "game.compiled.*"
+    "game-compiled"
   ],
   "compilerOptions": {
     // Enable latest features
@@ -12,7 +12,7 @@
     "target": "ESNext",
     "module": "ESNext",
     "moduleDetection": "force",
-    "jsx": "react-jsx",
+    "rootDir": "./src",
     "allowJs": true,
     // Bundler mode
     "moduleResolution": "bundler",

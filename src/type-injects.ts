@@ -1,86 +1,9 @@
-export function assert(v: any, msg?: string): asserts v {
-    if (!v) throw new Error(`Assertion error${msg ? `: ${msg}` : ''}`)
-}
 import ts, { SyntaxKind } from 'typescript'
-import * as lebab from 'lebab'
 import * as fs from 'fs'
 import * as path from 'path'
-const fileExists = async (path: string) => !!(await fs.promises.stat(path).catch(_ => false))
-
-const typedefRepoPath = process.env['TYPEDEF_REPO']!
-let gameCompiledPath = process.env['GAME_COMPILED_JS']!
-const outGameCompiledPath = process.env['OUTPUT_GAME_COMPILED_JS']!
-assert(typedefRepoPath, 'TYPEDEF_REPO enviroment variable not set!')
-assert(gameCompiledPath, 'GAME_COMPILED_JS enviroment variable not set!')
-assert(outGameCompiledPath, 'OUTPUT_GAME_COMPILED_JS enviroment variable not set!')
-const outTypesPath: string = './typedefs.json'
-
-async function applyLebab() {
-    const outPath = './game.compiled.lebab.js'
-    if (!fileExists(outPath)) {
-        const orig = await fs.promises.readFile(gameCompiledPath, 'utf8')
-        let code = orig
-
-        /* this has to split into multiple passes because of https://github.com/lebab/lebab/issues/205 */
-        console.log('running lebab pass 1...')
-        code = lebab.transform(code, ['multi-var']).code
-        console.log('running lebab pass 2...')
-        code = lebab.transform(code, ['multi-var']).code
-        // type res = { code: string; warnings: { type: string; line: number; msg: string }[] }
-        console.log('running lebab pass 3...')
-        code = lebab.transform(code, [
-            // 'class',
-            'template',
-            'arrow',
-            'arrow-return',
-            'let',
-            'default-param',
-            // 'destruct-param',
-            'arg-spread',
-            'arg-rest',
-            'obj-method',
-            'obj-shorthand',
-            // 'no-strict',
-            // 'commonjs',
-            'exponent',
-            'for-of',
-            // 'for-each',
-            'includes',
-        ]).code
-        code = code.replace(/window\.ig\.Class = \(\) =\> \{\}/, 'window.ig.Class = function() {}')
-        code = code.replace(/let g;(\s+if \(this.attackCounter \<= 3)/, 'var g;$1')
-        await fs.promises.writeFile(outPath, code, 'utf8')
-    }
-    gameCompiledPath = outPath
-}
-await applyLebab()
-
-type Type = string
-export interface Field {
-    type: Type
-    isOptional?: boolean
-}
-export interface Function {
-    returnType: string
-    args: {
-        name: string
-        type: string
-        isOptional: boolean
-    }[]
-}
-export interface VarList {
-    fields: Record<string, Field>
-    functions: Record<string, Function>
-
-    parents: string[]
-}
-function defVarList(): VarList {
-    return {
-        fields: {},
-        functions: {},
-        parents: [],
-    }
-}
+import { type ChangeQueue } from './inject-into-game-compiled'
+import { assert } from './misc'
+import type { Field, VarList, Function } from './modules-info'
 
 type IndentStyle = 'tab' | '2space' | '4space'
 function getIndentStyleOfFile(lines: string[]): IndentStyle {
@@ -136,183 +59,19 @@ function getIndentX(style: IndentStyle, count: number) {
     if (style == '4space') return '    '.repeat(count)
 }
 
-const typedefModulesPath = `${typedefRepoPath}/modules`
-const typedefModuleList = (await fs.promises.readdir(typedefModulesPath)).map(a => a.slice(0, -5)).filter(Boolean)
-const typedefModulesIndentStyles: Map<string, IndentStyle> = new Map(
-    await Promise.all(
-        typedefModuleList.map(async module => {
-            const str = await fs.promises.readFile(typedefModulesPath + '/' + module + '.d.ts', 'utf8')
-            return [module, getIndentStyleOfFile(str.split('\n'))] as [string, IndentStyle]
-        })
-    )
-)
-
-let typedefModuleRecord: Record<string, Record<string, VarList>> = {}
-for (const module of typedefModuleList) typedefModuleRecord[module] = {}
-
-const classPathToModule: Record<string, string> = {}
-
-// function print(node: ts.Node) {
-//     console.log(
-//         node.getChildren().map(a => {
-//             return {
-//                 kind: a.kind,
-//                 text: a.getText().slice(0, 100),
-//             }
-//         })
-//     )
-// }
-declare global {
-    interface Array<T> {
-        last(): T
-    }
-}
-Array.prototype.last = function (this: []) {
-    return this[this.length - 1]
-}
-async function getModulesInfo(force: boolean = false) {
-    console.log('reading from typedefs...')
-    if (!force && (await fileExists(outTypesPath))) {
-        const data = JSON.parse(await fs.promises.readFile(outTypesPath, 'utf8'))
-        typedefModuleRecord = data
-        return
-    }
-
-    const files = typedefModuleList.map(a => `${typedefModulesPath}/${a}`)
-    const program = ts.createProgram(files, {
-        target: ts.ScriptTarget.ES2015,
-        module: ts.ModuleKind.CommonJS,
-    })
-
-    program.getTypeChecker()
-
-    for (const sourceFile of program.getSourceFiles()) {
-        const baseName = path.basename(sourceFile.fileName)
-        if (!(baseName.startsWith('game.') || baseName.startsWith('impact.'))) continue
-
-        const module = baseName.slice(0, -5)
-        ts.forEachChild(sourceFile, node => visit(module, node, []))
-    }
-    fs.promises.writeFile('typedefs.json', JSON.stringify(typedefModuleRecord, null, 4))
-    return
-
-    function getTypeFullName(type: string, _nsStack: string[]): string {
-        if (
-            type == 'number' ||
-            type == 'string' ||
-            type == 'unknown' ||
-            type == 'boolean' ||
-            type == 'object' ||
-            type == 'function'
+async function readModuleIndentStyles(typedefModuleList: string[], typedefModulesPath: string) {
+    const typedefModulesIndentStyles: Map<string, IndentStyle> = new Map(
+        await Promise.all(
+            typedefModuleList.map(async module => {
+                const str = await fs.promises.readFile(typedefModulesPath + '/' + module + '.d.ts', 'utf8')
+                return [module, getIndentStyleOfFile(str.split('\n'))] as [string, IndentStyle]
+            })
         )
-            return type
-
-        return type
-        // if (type.startsWith('ig') || type.startsWith('sc')) return type
-        //
-        // return nsStack.join('.') + '.' + type
-    }
-
-    function visit(module: string, node: ts.Node, nsStack: string[]) {
-        if (ts.isModuleDeclaration(node)) {
-            const name = node.name.text
-            if (name != 'global') nsStack.push(name)
-        } else if (ts.isEnumDeclaration(node)) {
-            // nah
-        } else if (ts.isTypeAliasDeclaration(node)) {
-            // nah
-        } else if (ts.isVariableDeclaration(node)) {
-            const name = node.name.getText()
-            const type = getTypeFullName(node.type!.getText(), nsStack)
-            const nsPath = nsStack.join('.')
-            typedefModuleRecord[module][nsPath] ??= defVarList()
-            typedefModuleRecord[module][nsPath].fields[name] = { type }
-        } else if (ts.isPropertySignature(node)) {
-            const name = node.name.getText()
-            const type = getTypeFullName(node.type!.getText(), nsStack)
-            const nsPath = nsStack.join('.')
-            typedefModuleRecord[module][nsPath] ??= defVarList()
-            typedefModuleRecord[module][nsPath].fields[name] = { type, isOptional: !!node.questionToken }
-
-            const right = node.getChildren()[2]
-            if (ts.isTypeLiteralNode(right)) {
-                if (right.getChildren()[0].kind == 19 && right.getChildren()[2].kind == 20) {
-                    nsStack.push(name)
-                }
-            }
-        } else if (ts.isInterfaceDeclaration(node)) {
-            let name = node.name.text
-            if (name.endsWith('Constructor')) name = name.slice(0, -'Constructor'.length)
-            if (name.endsWith('_CONSTRUCTOR')) name = name.slice(0, -'_CONSTRUCTOR'.length)
-
-            nsStack.push(name)
-            const nsPath = nsStack.join('.')
-            classPathToModule[nsPath] = module
-            if (node.heritageClauses && node.heritageClauses.length > 0) {
-                for (const type of node.heritageClauses![0].types) {
-                    const typeStr = type.getText()
-                    typedefModuleRecord[module][nsPath] ??= defVarList()
-                    if (!typeStr.startsWith('ImpactClass')) {
-                        typedefModuleRecord[module][nsPath].parents.push(typeStr)
-                    }
-                }
-            }
-        } else if (ts.isMethodSignature(node)) {
-            const name = node.name.getText()
-            const returnType = getTypeFullName(node.type!.getText(), nsStack)
-            const args: Function['args'] = node.parameters.map(a => {
-                let name = a.name.getText()
-                if (name.length == 1) name = name + '_'
-                return {
-                    name,
-                    type: getTypeFullName(a.type?.getText() ?? 'unknown', nsStack),
-                    isOptional: !!a.questionToken,
-                }
-            })
-            if (args.length > 0 && args[0].name == 'this') args.splice(0, 1)
-            const nsPath = nsStack.join('.')
-            typedefModuleRecord[module][nsPath] ??= defVarList()
-            typedefModuleRecord[module][nsPath].functions[name] = { returnType, args }
-        } else if (ts.isConstructSignatureDeclaration(node)) {
-            const args: Function['args'] = node.parameters.map(a => {
-                let name = a.name.getText()
-                if (name.length == 1) name = name + '_'
-                return {
-                    name,
-                    type: getTypeFullName(a.type?.getText() ?? 'unknown', nsStack),
-                    isOptional: !!a.questionToken,
-                }
-            })
-
-            const returnType = getTypeFullName(node.type!.getText(), nsStack)
-            let nsPath: string
-            if (returnType.startsWith('ig.') || returnType.startsWith('sc.')) {
-                nsPath = returnType
-            } else {
-                nsPath = [...nsStack.slice(0, -1), returnType].join('.')
-            }
-            typedefModuleRecord[module][nsPath] ??= defVarList()
-            typedefModuleRecord[module][nsPath].functions['init'] = { returnType, args }
-        }
-        ts.forEachChild(node, node => visit(module, node, [...nsStack]))
-    }
-}
-await getModulesInfo(true)
-
-// prettier-ignore
-const changeQueue: ({ pos: number } & (
-    { operation: 'inject'; type: string, isOptional?: boolean } |
-    { operation: 'rename'; from: string; to: string }
-))[] = []
-
-const typedStats = {
-    fields: { typed: 0, untyped: 0 },
-    functions: { typed: 0, untyped: 0 },
-    classes: { typed: 0, untyped: 0 },
+    )
+    return { typedefModulesIndentStyles }
 }
 
-async function getTypeInjects() {
-    console.log('gathering all changes...')
+export async function createGameCompiledProgram(gameCompiledPath: string) {
     const gameCompiledSplit: string[] = (await fs.promises.readFile(gameCompiledPath, 'utf8')).split('\n')
     const program = ts.createProgram([gameCompiledPath], {
         target: ts.ScriptTarget.ES5,
@@ -324,13 +83,38 @@ async function getTypeInjects() {
 
     const gameCompiledIndentStyle: IndentStyle = getIndentStyleOfFile(gameCompiledSplit)
 
-    const gameCompiledPathBase = path.basename(gameCompiledPath)
-    for (const sourceFile of program.getSourceFiles()) {
+    return { program, gameCompiledIndentStyle, gameCompiledSplit, pathBase: path.basename(gameCompiledPath) }
+}
+
+export async function getTypeInjectsAndTypedStats(
+    classPathToModule: Record<string, string>,
+    typedefModuleRecord: Record<string, Record<string, VarList>>,
+    typedefModulesPath: string,
+    gameCompiledInfo: Awaited<ReturnType<typeof createGameCompiledProgram>>,
+    generateInjects: boolean = true
+) {
+    const changeQueue: ChangeQueue = []
+
+    const typedStats = {
+        fields: { typed: 0, untyped: 0 },
+        functions: { typed: 0, untyped: 0 },
+        classes: { typed: 0, untyped: 0 },
+    }
+
+    console.log('gathering all changes...')
+
+    const { typedefModulesIndentStyles } = generateInjects
+        ? await readModuleIndentStyles(Object.keys(typedefModuleRecord), typedefModulesPath)
+        : { typedefModulesIndentStyles: new Map<string, IndentStyle>() }
+
+    for (const sourceFile of gameCompiledInfo.program.getSourceFiles()) {
         const baseName = path.basename(sourceFile.fileName)
-        if (!baseName.startsWith(gameCompiledPathBase)) continue
+        if (!baseName.startsWith(gameCompiledInfo.pathBase)) continue
 
         ts.forEachChild(sourceFile, node => rootVisit(node))
     }
+
+    return { changeQueue, typedStats }
 
     function rootVisit(node: ts.Node, depth: number = 0) {
         if (ts.isCallExpression(node)) {
@@ -425,7 +209,7 @@ async function getTypeInjects() {
             } else {
                 const type = getFunction(nsPath, varList, name)
                 typedStats.functions[type ? 'typed' : 'untyped']++
-                if (type) {
+                if (generateInjects && type) {
                     const argNames = right.parameters.map(a => a.name.getText())
                     const len = Math.min(argNames.length, type.args.length)
                     if (len != type.args.length && name == 'init') return
@@ -535,7 +319,7 @@ async function getTypeInjects() {
                         checkAndReplaceWithRecord(module, `${nsPath}.${name}`, type)
                     }
 
-                    if (type && (!ts.isObjectLiteralExpression(right) || !type.type.includes('{'))) {
+                    if (generateInjects && type && (!ts.isObjectLiteralExpression(right) || !type.type.includes('{'))) {
                         const indentStyle: IndentStyle = typedefModulesIndentStyles.get(module)!
                         const sp = type.type.split('\n')
                         const indents: number[] = sp.map(line => getIndentCountOfLine(indentStyle, line))
@@ -544,12 +328,15 @@ async function getTypeInjects() {
                         for (let i = 1; i < indents.length; i++) indents[i] -= minIndent
 
                         const { line } = ts.getLineAndCharacterOfPosition(node.getSourceFile(), node.getStart())
-                        const baseIndent = getIndentCountOfLine(gameCompiledIndentStyle, gameCompiledSplit[line])
+                        const baseIndent = getIndentCountOfLine(
+                            gameCompiledInfo.gameCompiledIndentStyle,
+                            gameCompiledInfo.gameCompiledSplit[line]
+                        )
                         for (let i = 1; i < indents.length; i++) indents[i] += baseIndent
                         indents[indents.length - 1] = baseIndent
 
                         for (let i = 1; i < sp.length; i++) {
-                            sp[i] = getIndentX(gameCompiledIndentStyle, indents[i]) + sp[i].trim()
+                            sp[i] = getIndentX(gameCompiledInfo.gameCompiledIndentStyle, indents[i]) + sp[i].trim()
                         }
 
                         const typeStr = sp.join('\n')
@@ -613,31 +400,3 @@ async function getTypeInjects() {
             .forEach(node => functionVisit(node, module, nsPath, varTable))
     }
 }
-await getTypeInjects()
-
-async function injectIntoGameCompiled() {
-    console.log('modifing code...')
-    const code = await fs.promises.readFile(gameCompiledPath, 'utf8')
-
-    const res: string[] = []
-    let i = 0
-    for (let obj of changeQueue) {
-        res.push(code.slice(i, obj.pos))
-        i = obj.pos
-
-        if (obj.operation == 'inject') {
-            const str = `/*${obj.isOptional ? '?' : ''}: ${obj.type}*/`
-            res.push(str)
-        } else if (obj.operation == 'rename') {
-            res.push(obj.to)
-            i += obj.from.length
-        } else assert(false)
-    }
-    res.push(code.slice(i, code.length))
-
-    await fs.promises.writeFile(outGameCompiledPath, res.join(''), 'utf8')
-}
-await injectIntoGameCompiled()
-console.log(typedStats)
-console.log('all done')
-console.log('result saved into', outGameCompiledPath)
