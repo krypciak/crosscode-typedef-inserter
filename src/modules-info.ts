@@ -91,7 +91,8 @@ export async function getModulesInfo(typedefModulesPath: string) {
             typedefModuleRecord[module][nsPath].fields[name] = { type }
         } else if (ts.isPropertySignature(node)) {
             const name = node.name.getText()
-            const type = getTypeFullName(node.type!.getText(), nsStack)
+            if (!node.type) return
+            const type = getTypeFullName(node.type.getText(), nsStack)
             const nsPath = nsStack.join('.')
             typedefModuleRecord[module][nsPath] ??= defVarList()
             typedefModuleRecord[module][nsPath].fields[name] = { type, isOptional: !!node.questionToken }
