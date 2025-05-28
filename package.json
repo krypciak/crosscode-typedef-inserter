@@ -7,15 +7,12 @@
     "dependencies": {
         "@types/bun": "^1.2.3",
         "bun": "^1.2.3",
-        "lebab": "github:krypciak/lebab",
+        "lebab": "^3.2.7",
         "typescript": "^5.0.0"
     },
     "pnpm": {
         "onlyBuiltDependencies": [
             "bun"
-        ],
-        "overrides": {
-            "lebab": "link:../../../../.local/share/pnpm/global/5/node_modules/lebab"
-        }
+        ]
     }
 }

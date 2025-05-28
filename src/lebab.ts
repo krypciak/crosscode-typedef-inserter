@@ -1,3 +1,4 @@
+// @ts-expect-error
 import * as lebab from 'lebab'
 import * as fs from 'fs'
 import { fileExists } from './misc'
