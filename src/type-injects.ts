@@ -86,6 +86,24 @@ export async function createGameCompiledProgram(gameCompiledPath: string) {
     return { program, gameCompiledIndentStyle, gameCompiledSplit, pathBase: path.basename(gameCompiledPath) }
 }
 
+function setLocalClasses(
+    classPathToModule: Record<string, string>,
+    typedefModuleRecord: Record<string, Record<string, VarList>>
+) {
+    {
+        const module = 'game.feature.gui.hud.combat-hud'
+        const combatHud = typedefModuleRecord[module]
+        combatHud['b.ContentGui'] = combatHud['sc.CombatUpperHud.ContentGui']
+        combatHud['b.EMPTY'] = combatHud['sc.CombatUpperHud.CONTENT_GUI.EMPTY']
+        combatHud['b.RANKED'] = combatHud['sc.CombatUpperHud.CONTENT_GUI.RANKED']
+        combatHud['b.PVP'] = combatHud['sc.CombatUpperHud.CONTENT_GUI.PVP']
+        classPathToModule['b.ContentGui'] = module
+        classPathToModule['b.EMPTY'] = module
+        classPathToModule['b.RANKED'] = module
+        classPathToModule['b.PVP'] = module
+    }
+}
+
 export async function getTypeInjectsAndTypedStats(
     classPathToModule: Record<string, string>,
     typedefModuleRecord: Record<string, Record<string, VarList>>,
@@ -102,6 +120,8 @@ export async function getTypeInjectsAndTypedStats(
     }
 
     console.log('gathering all changes...')
+
+    setLocalClasses(classPathToModule, typedefModuleRecord)
 
     const { typedefModulesIndentStyles } = generateInjects
         ? await readModuleIndentStyles(Object.keys(typedefModuleRecord), typedefModulesPath)
@@ -167,12 +187,16 @@ export async function getTypeInjectsAndTypedStats(
     ): VarList[T][any] | undefined {
         if (depth >= 100) throw new Error('depth limit!')
         if (varList[type][name]) return varList[type][name] as any
+
         for (let parentPath of varList.parents) {
             if (!parentPath || parentPath == 'ig.Class' || parentPath == 'ig.Config') continue
-            if (!parentPath.startsWith('ig.') && !parentPath.startsWith('sc.')) {
+
+            let module = classPathToModule[parentPath]
+            if (!module && !parentPath.startsWith('ig.') && !parentPath.startsWith('sc.')) {
                 parentPath = nsPath.substring(0, nsPath.lastIndexOf('.')) + '.' + parentPath
+                module = classPathToModule[parentPath]
             }
-            const module = classPathToModule[parentPath]
+
             if (!module) continue
             const newVarList = typedefModuleRecord[module][parentPath]
             if (!newVarList) continue
@@ -210,6 +234,7 @@ export async function getTypeInjectsAndTypedStats(
             } else {
                 const type = getFunction(nsPath, varList, name)
                 typedStats.functions[type ? 'typed' : 'untyped']++
+
                 if (generateInjects && type) {
                     const argNames = right.parameters.map(a => a.name.getText())
                     const len = Math.min(argNames.length, type.args.length)
@@ -313,7 +338,7 @@ export async function getTypeInjectsAndTypedStats(
                     }
                     const type = getField(nsPath, varList, name)
                     if (isUnderClass(node)) {
-                        typedStats.fields[(type && type.type != 'unknown') ? 'typed' : 'untyped']++
+                        typedStats.fields[type && type.type != 'unknown' ? 'typed' : 'untyped']++
                     }
 
                     if (type && ts.isObjectLiteralExpression(right)) {
