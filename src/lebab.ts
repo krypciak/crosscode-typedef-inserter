@@ -34,7 +34,7 @@ function applyLebabToCode(origCode: string) {
     ]).code
     code = code.replace(/window\.ig\.Class = \(\) =\> \{\}/, 'window.ig.Class = function() {}')
     code = code.replace(/let g;(\s+if \(this.attackCounter \<= 3)/, 'var g;$1')
-    code = code.replace(/new ig\.TileSheet\.createFromJson/, 'ig.TileSheet.createFromJson')
+    code = code.replace(/new ig\.TileSheet\.createFromJson/g, 'ig.TileSheet.createFromJson')
 
     return code
 }
