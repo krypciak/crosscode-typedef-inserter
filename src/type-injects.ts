@@ -107,6 +107,10 @@ function getClassAliases(
     alias('impact.feature.gui.gui', 'i', 'ig.GuiRenderer')
     alias('game.feature.combat.model.enemy-reaction', 'a', 'sc.EnemyReactionBase')
     alias('game.feature.combat.entities.ball', 'sc.PROXY_TYPE.BALL', 'sc.BallInfo', true)
+    alias('game.feature.combat.model.combat-status', 'sc.COMBAT_STATUS[0]', 'sc.BurnStatus')
+    alias('game.feature.combat.model.combat-status', 'sc.COMBAT_STATUS[1]', 'sc.ChillStatus')
+    alias('game.feature.combat.model.combat-status', 'sc.COMBAT_STATUS[2]', 'sc.JoltStatus')
+    alias('game.feature.combat.model.combat-status', 'sc.COMBAT_STATUS[3]', 'sc.MarkStatus')
 }
 
 export async function getTypeInjectsAndTypedStats(
