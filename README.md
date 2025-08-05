@@ -12,7 +12,7 @@
 - `for (... of ...)` sometimes
 - template strings
 - changing `var` to `let` or `const` where possible
-- splitting annoying multi-line variable declarations into seperate declarations
+- splitting annoying multi-line variable declarations into separate declarations
 - `game.compiled.js` becomes 0.3M smaller
 
 | From | To |
@@ -23,14 +23,36 @@
 
 Edit the `.env` file to include paths. An example `.env` can look like:  
 ```bash
-TYPEDEF_REPO=./ultimate-crosscode-typedefs
-GAME_COMPILED_JS=./game.compiled.js
-OUTPUT_GAME_COMPILED_JS=./game.compiled.typed.js
+TYPEDEF_REPO=./game-compiled/ultimate-crosscode-typedefs
+GAME_COMPILED_JS=./game-compiled/game.compiled.js
+OUTPUT_GAME_COMPILED_JS=./game-compiled/game.compiled.typed.js
 ```
 
 Then run:  
 
 ```bash
+npm start
+```
+
+Automated script:
+```bash
+#/bin/sh
+set -e
+game_compied_js_path="MY_CROSSCODE_DIR/assets/js/game.compiled.js"
+
+git clone https://github.com/krypciak/crosscode-typedef-inserter
+cd crosscode-typedef-inserter
+mkdir game-compiled
+cd game-compiled
+cp "$game_compiled_js_path" game.compiled.js
+prettier -w game.compiled.js
+
+git clone https://github.com/krypciak/ultimate-crosscode-typedefs
+cd ultimate-crosscode-typedefs
+npm install
+cd ..
+cd ..
+sed -i 's/TYPEDEF_REPO=/TYPEDEF_REPO=.\/game-compiled\/ultimate-crosscode-typedefs/g' .env
 npm install
 npm start
 ```
