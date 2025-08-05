@@ -90,27 +90,39 @@ function getClassAliases(
     classPathToModule: Record<string, string>,
     typedefModuleRecord: Record<string, Record<string, VarList>>
 ) {
-    function alias(module: string, gameCompiledName: string, typedefName: string, noSetModule?: boolean) {
+    function alias(module: string, aliases: Record<string, string>, noSetModule?: boolean) {
         const obj = typedefModuleRecord[module]
         assert(obj)
-        obj[gameCompiledName] = obj[typedefName]
-        if (!noSetModule) {
-            assert(!classPathToModule[gameCompiledName])
-            classPathToModule[gameCompiledName] = module
+        for (const [gameCompiledName, typedefName] of Object.entries(aliases)) {
+            obj[gameCompiledName] = obj[typedefName]
+            if (!noSetModule) {
+                assert(!classPathToModule[gameCompiledName])
+                classPathToModule[gameCompiledName] = module
+            }
         }
     }
 
-    alias('game.feature.gui.hud.combat-hud', 'b.ContentGui', 'sc.CombatUpperHud.ContentGui')
-    alias('game.feature.gui.hud.combat-hud', 'b.EMPTY', 'sc.CombatUpperHud.CONTENT_GUI.EMPTY')
-    alias('game.feature.gui.hud.combat-hud', 'b.RANKED', 'sc.CombatUpperHud.CONTENT_GUI.RANKED')
-    alias('game.feature.gui.hud.combat-hud', 'b.PVP', 'sc.CombatUpperHud.CONTENT_GUI.PVP')
-    alias('impact.feature.gui.gui', 'i', 'ig.GuiRenderer')
-    alias('game.feature.combat.model.enemy-reaction', 'a', 'sc.EnemyReactionBase')
-    alias('game.feature.combat.entities.ball', 'sc.PROXY_TYPE.BALL', 'sc.BallInfo', true)
-    alias('game.feature.combat.model.combat-status', 'sc.COMBAT_STATUS[0]', 'sc.BurnStatus')
-    alias('game.feature.combat.model.combat-status', 'sc.COMBAT_STATUS[1]', 'sc.ChillStatus')
-    alias('game.feature.combat.model.combat-status', 'sc.COMBAT_STATUS[2]', 'sc.JoltStatus')
-    alias('game.feature.combat.model.combat-status', 'sc.COMBAT_STATUS[3]', 'sc.MarkStatus')
+    alias('game.feature.gui.hud.combat-hud', {
+        'b.ContentGui': 'sc.CombatUpperHud.ContentGui',
+        'b.EMPTY': 'sc.CombatUpperHud.CONTENT_GUI.EMPTY',
+        'b.RANKED': 'sc.CombatUpperHud.CONTENT_GUI.RANKED',
+        'b.PVP': 'sc.CombatUpperHud.CONTENT_GUI.PVP',
+    })
+    alias('impact.feature.gui.gui', { i: 'ig.GuiRenderer' })
+    alias('game.feature.combat.model.enemy-reaction', { a: 'sc.EnemyReactionBase' })
+    alias('game.feature.combat.entities.ball', { 'sc.PROXY_TYPE.BALL': 'sc.BallInfo' }, true)
+    alias('game.feature.combat.model.combat-status', { 'sc.COMBAT_STATUS[0]': 'sc.BurnStatus' })
+    alias('game.feature.combat.model.combat-status', { 'sc.COMBAT_STATUS[1]': 'sc.ChillStatus' })
+    alias('game.feature.combat.model.combat-status', { 'sc.COMBAT_STATUS[2]': 'sc.JoltStatus' })
+    alias('game.feature.combat.model.combat-status', { 'sc.COMBAT_STATUS[3]': 'sc.MarkStatus' })
+    alias('game.feature.menu.gui.options.options-types', {
+        'sc.OPTION_GUIS[sc.OPTION_TYPES.BUTTON_GROUP]': 'sc.OPTION_GUIS_DEFS.BUTTON_GROUP',
+        'sc.OPTION_GUIS[sc.OPTION_TYPES.OBJECT_SLIDER]': 'sc.OPTION_GUIS_DEFS.OBJECT_SLIDER',
+        'sc.OPTION_GUIS[sc.OPTION_TYPES.ARRAY_SLIDER]': 'sc.OPTION_GUIS_DEFS.ARRAY_SLIDER',
+        'sc.OPTION_GUIS[sc.OPTION_TYPES.CONTROLS]': 'sc.OPTION_GUIS_DEFS.CONTROLS',
+        'sc.OPTION_GUIS[sc.OPTION_TYPES.LANGUAGE]': 'sc.OPTION_GUIS_DEFS.LANGUAGE',
+    })
+    alias('impact.feature.effect.fx.fx-circle', { e: 'ig.EFFECT_ENTRY.EffectStepCircleBase', })
 }
 
 export async function getTypeInjectsAndTypedStats(
