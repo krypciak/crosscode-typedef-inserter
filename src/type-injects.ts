@@ -86,28 +86,27 @@ export async function createGameCompiledProgram(gameCompiledPath: string) {
     return { program, gameCompiledIndentStyle, gameCompiledSplit, pathBase: path.basename(gameCompiledPath) }
 }
 
-function setLocalClasses(
+function getClassAliases(
     classPathToModule: Record<string, string>,
     typedefModuleRecord: Record<string, Record<string, VarList>>
 ) {
-    {
-        const module = 'game.feature.gui.hud.combat-hud'
-        const combatHud = typedefModuleRecord[module]
-        combatHud['b.ContentGui'] = combatHud['sc.CombatUpperHud.ContentGui']
-        combatHud['b.EMPTY'] = combatHud['sc.CombatUpperHud.CONTENT_GUI.EMPTY']
-        combatHud['b.RANKED'] = combatHud['sc.CombatUpperHud.CONTENT_GUI.RANKED']
-        combatHud['b.PVP'] = combatHud['sc.CombatUpperHud.CONTENT_GUI.PVP']
-        classPathToModule['b.ContentGui'] = module
-        classPathToModule['b.EMPTY'] = module
-        classPathToModule['b.RANKED'] = module
-        classPathToModule['b.PVP'] = module
+    function alias(module: string, gameCompiledName: string, typedefName: string, noSetModule?: boolean) {
+        const obj = typedefModuleRecord[module]
+        assert(obj)
+        obj[gameCompiledName] = obj[typedefName]
+        if (!noSetModule) {
+            assert(!classPathToModule[gameCompiledName])
+            classPathToModule[gameCompiledName] = module
+        }
     }
-    {
-        const module = 'impact.feature.gui.gui'
-        const gui = typedefModuleRecord[module]
-        gui['i'] = gui['ig.GuiRenderer']
-        classPathToModule['i'] = module
-    }
+
+    alias('game.feature.gui.hud.combat-hud', 'b.ContentGui', 'sc.CombatUpperHud.ContentGui')
+    alias('game.feature.gui.hud.combat-hud', 'b.EMPTY', 'sc.CombatUpperHud.CONTENT_GUI.EMPTY')
+    alias('game.feature.gui.hud.combat-hud', 'b.RANKED', 'sc.CombatUpperHud.CONTENT_GUI.RANKED')
+    alias('game.feature.gui.hud.combat-hud', 'b.PVP', 'sc.CombatUpperHud.CONTENT_GUI.PVP')
+    alias('impact.feature.gui.gui', 'i', 'ig.GuiRenderer')
+    alias('game.feature.combat.model.enemy-reaction', 'a', 'sc.EnemyReactionBase')
+    alias('game.feature.combat.entities.ball', 'sc.PROXY_TYPE.BALL', 'sc.BallInfo', true)
 }
 
 export async function getTypeInjectsAndTypedStats(
@@ -127,7 +126,7 @@ export async function getTypeInjectsAndTypedStats(
 
     console.log('gathering all changes...')
 
-    setLocalClasses(classPathToModule, typedefModuleRecord)
+    getClassAliases(classPathToModule, typedefModuleRecord)
 
     const { typedefModulesIndentStyles } = generateInjects
         ? await readModuleIndentStyles(Object.keys(typedefModuleRecord), typedefModulesPath)
@@ -300,13 +299,13 @@ export async function getTypeInjectsAndTypedStats(
             const right = ts.isBinaryExpression(node) ? node.right : node.initializer!
 
             if (right.getChildCount() == 4 && right.getChildren()[0].getText().includes('extend')) {
-                if (name == 'sc.PROXY_TYPE.BALL') name = 'sc.BallInfo'
                 // class extend
                 nsStack.push(name)
 
                 const nsPath = nsStack.join('.')
                 const varList: VarList = typedefModuleRecord[module][nsPath]
                 typedStats.classes[varList ? 'typed' : 'untyped']++
+                // if (!varList) console.log(nsPath, '\t\t\t\t', module)
             } else if (
                 right.getChildCount() == 3 &&
                 right.getChildren()[0].kind == 19 &&
