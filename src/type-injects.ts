@@ -102,6 +102,12 @@ function setLocalClasses(
         classPathToModule['b.RANKED'] = module
         classPathToModule['b.PVP'] = module
     }
+    {
+        const module = 'impact.feature.gui.gui'
+        const gui = typedefModuleRecord[module]
+        gui['i'] = gui['ig.GuiRenderer']
+        classPathToModule['i'] = module
+    }
 }
 
 export async function getTypeInjectsAndTypedStats(
@@ -285,9 +291,15 @@ export async function getTypeInjectsAndTypedStats(
         }
 
         let nextVisit = true
-        if (ts.isBinaryExpression(node) && node.operatorToken.kind == SyntaxKind.EqualsToken) {
-            let name = node.left.getText()
-            if (node.right.getChildCount() == 4 && node.right.getChildren()[0].getText().includes('extend')) {
+
+        if (
+            (ts.isBinaryExpression(node) && node.operatorToken.kind == SyntaxKind.EqualsToken) ||
+            (ts.isVariableDeclaration(node) && node.initializer)
+        ) {
+            let name = ts.isBinaryExpression(node) ? node.left.getText() : node.name.getText()
+            const right = ts.isBinaryExpression(node) ? node.right : node.initializer!
+
+            if (right.getChildCount() == 4 && right.getChildren()[0].getText().includes('extend')) {
                 if (name == 'sc.PROXY_TYPE.BALL') name = 'sc.BallInfo'
                 // class extend
                 nsStack.push(name)
@@ -296,9 +308,9 @@ export async function getTypeInjectsAndTypedStats(
                 const varList: VarList = typedefModuleRecord[module][nsPath]
                 typedStats.classes[varList ? 'typed' : 'untyped']++
             } else if (
-                node.right.getChildCount() == 3 &&
-                node.right.getChildren()[0].kind == 19 &&
-                node.right.getChildren()[2].kind == 20
+                right.getChildCount() == 3 &&
+                right.getChildren()[0].kind == 19 &&
+                right.getChildren()[2].kind == 20
             ) {
                 // function namespace
                 nsStack.push(name)
@@ -309,14 +321,13 @@ export async function getTypeInjectsAndTypedStats(
                     changeQueue.push({
                         operation: 'inject',
                         type: type.type,
-                        pos: node.right.getChildren()[0].getStart() - 1,
+                        pos: right.getChildren()[0].getStart() - 1,
                     })
                 }
-            } else if (ts.isFunctionExpression(node.right) || ts.isArrowFunction(node.right)) {
-                const ns = node.left.getText()
-                const sp = ns.split('.')
-                const name = sp.last()
-                injectIntoFunction(sp.slice(0, -1).join('.'), name, node.right)
+            } else if (ts.isFunctionExpression(right) || ts.isArrowFunction(right)) {
+                const sp = name.split('.')
+                const funcName = sp.last()
+                injectIntoFunction(sp.slice(0, -1).join('.'), funcName, right)
             }
         } else if (ts.isObjectLiteralElement(node)) {
             const name = node.name!.getText()
