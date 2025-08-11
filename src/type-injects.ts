@@ -488,9 +488,10 @@ export async function getTypeInjectsAndTypedStats(
                 }
             }
         }
+        const passVarTable = ts.isFunctionExpression(node) || ts.isArrowFunction(node) ? new Map(varTable) : varTable
 
         node.getChildren()
             .slice(childOffset)
-            .forEach(node => functionVisit(node, module, nsPath, varTable))
+            .forEach(node => functionVisit(node, module, nsPath, passVarTable))
     }
 }
