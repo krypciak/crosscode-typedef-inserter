@@ -135,9 +135,11 @@ export async function getTypeInjectsAndTypedStats(
     const changeQueue: ChangeQueue = []
 
     const typedStats = {
-        fields: { typed: 0, untyped: 0 },
-        functions: { typed: 0, untyped: 0 },
-        classes: { typed: 0, untyped: 0 },
+        fields: { typed: [] as [string, string][], untyped: [] as [string, string][] },
+        methods: { typed: [] as [string, string][], untyped: [] as [string, string][] },
+        functions: { typed: [] as [string, string][], untyped: [] as [string, string][] },
+        localFunctions: { typed: [] as [string, string][], untyped: [] as [string, string][] },
+        classes: { typed: [] as [string, string][], untyped: [] as [string, string][] },
     }
 
     console.log('gathering all changes...')
@@ -250,12 +252,16 @@ export async function getTypeInjectsAndTypedStats(
         ) => {
             const varList: VarList = typedefModuleRecord[module][nsPath]
 
-            if (!varList) {
-                typedStats.functions.untyped++
-            } else {
-                const type = getFunction(nsPath, varList, name)
-                typedStats.functions[type ? 'typed' : 'untyped']++
+            const type = varList ? getFunction(nsPath, varList, name) : undefined
+            typedStats[
+                ts.isFunctionDeclaration(right)
+                    ? 'localFunctions'
+                    : ts.isMethodDeclaration(right)
+                      ? 'methods'
+                      : 'functions'
+            ][type ? 'typed' : 'untyped'].push([module, `${nsPath}${nsPath ? '.' : ''}${name}`])
 
+            if (type) {
                 if (generateInjects && type) {
                     if (type.renameTo) {
                         changeQueue.push({
@@ -338,7 +344,7 @@ export async function getTypeInjectsAndTypedStats(
 
                 const nsPath = nsStack.join('.')
                 const varList: VarList = typedefModuleRecord[module][nsPath]
-                typedStats.classes[varList ? 'typed' : 'untyped']++
+                typedStats.classes[varList ? 'typed' : 'untyped'].push([module, name])
                 // if (!varList) console.log(nsPath, '\t\t\t\t', module)
             } else if (
                 right.getChildCount() == 3 &&
@@ -376,14 +382,17 @@ export async function getTypeInjectsAndTypedStats(
                 injectIntoFunction(nsPath, name, right)
             } else {
                 if (!varList) {
-                    if (isUnderClass(node)) typedStats.fields.untyped++
+                    if (isUnderClass(node)) typedStats.fields.untyped.push([module, `${nsPath}.${name}`])
                 } else {
                     if (ts.isObjectLiteralExpression(right)) {
                         nsStack.push(name)
                     }
                     const type = getField(nsPath, varList, name)
                     if (isUnderClass(node)) {
-                        typedStats.fields[type && type.type != 'unknown' ? 'typed' : 'untyped']++
+                        typedStats.fields[type && type.type != 'unknown' ? 'typed' : 'untyped'].push([
+                            module,
+                            `${nsPath}.${name}`,
+                        ])
                     }
 
                     if (type && ts.isObjectLiteralExpression(right)) {

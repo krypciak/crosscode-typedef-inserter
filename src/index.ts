@@ -34,18 +34,28 @@ async function run() {
     console.log('all done')
     console.log('result saved into', outGameCompiledPath)
 
-    const { typed: ct, untyped: cu } = typedStats.classes
-    const { typed: ft, untyped: fu } = typedStats.functions
-    const { typed: et, untyped: eu } = typedStats.fields
-    const cavg = 100 * (ct / (ct + cu))
-    const favg = 100 * (ft / (ft + fu))
-    const eavg = 100 * (et / (et + eu))
+    let allTyped = 0
+    let allUntyped = 0
+
+    const statToStr = (name: string, { typed, untyped }: { typed: unknown[]; untyped: unknown[] }): string => {
+        const t = typed.length
+        const u = untyped.length
+        const avg = 100 * (t / (t + u))
+        allTyped += t
+        allUntyped += u
+        return `${name} total: ${(t + u).toString().padStart(5)}  typedefs: ${t.toString().padStart(5)}  ${avg.toFixed(2)}%\n`
+    }
+
     const text =
         '\n' +
-        `classes: total: ${ct + cu}, typedefs: ${ct}, ${cavg.toFixed(2)}%\n` +
-        `functions: total: ${ft + fu}, typedefs: ${ft}, ${favg.toFixed(2)}%\n` +
-        `fields: total: ${et + eu}, typedefs: ${et}, ${eavg.toFixed(2)}%\n` +
-        `total (avg % of classes + fields + functions): ${((cavg + favg + eavg) / 3).toFixed(2)}%\n`
+        statToStr('classes       ', typedStats.classes) +
+        statToStr('methods       ', typedStats.methods) +
+        statToStr('functions     ', typedStats.functions) +
+        statToStr('localFunctions', typedStats.localFunctions) +
+        statToStr('fields        ', typedStats.fields) +
+        statToStr('total         ', { typed: new Array(allTyped), untyped: new Array(allUntyped) })
     console.log(text)
+
+    // console.log(typedStats.functions.untyped.map(([module, path]) => `${path.padEnd(80)} ${module}`).join('\n'))
 }
 await run()
