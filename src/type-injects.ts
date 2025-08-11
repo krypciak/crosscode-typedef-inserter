@@ -122,7 +122,7 @@ function getClassAliases(
         'sc.OPTION_GUIS[sc.OPTION_TYPES.CONTROLS]': 'sc.OPTION_GUIS_DEFS.CONTROLS',
         'sc.OPTION_GUIS[sc.OPTION_TYPES.LANGUAGE]': 'sc.OPTION_GUIS_DEFS.LANGUAGE',
     })
-    alias('impact.feature.effect.fx.fx-circle', { e: 'ig.EFFECT_ENTRY.EffectStepCircleBase', })
+    alias('impact.feature.effect.fx.fx-circle', { e: 'ig.EFFECT_ENTRY.EffectStepCircleBase' })
 }
 
 export async function getTypeInjectsAndTypedStats(
@@ -342,6 +342,7 @@ export async function getTypeInjectsAndTypedStats(
             } else if (ts.isFunctionExpression(right) || ts.isArrowFunction(right)) {
                 const sp = name.split('.')
                 const funcName = sp.last()
+
                 injectIntoFunction(sp.slice(0, -1).join('.'), funcName, right)
             }
         } else if (ts.isObjectLiteralElement(node)) {

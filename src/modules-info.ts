@@ -120,8 +120,8 @@ export async function getModulesInfo(typedefModulesPath: string) {
                     }
                 }
             }
-        } else if (ts.isMethodSignature(node)) {
-            const name = node.name.getText()
+        } else if (ts.isMethodSignature(node) || ts.isFunctionDeclaration(node)) {
+            const name = node.name!.getText()
             const returnType = getTypeFullName(node.type!.getText(), nsStack)
             const args: Function['args'] = node.parameters.map(a => {
                 let name = a.name.getText()
