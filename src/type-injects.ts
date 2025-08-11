@@ -420,7 +420,18 @@ export async function getTypeInjectsAndTypedStats(
                 childOffset = 1
             }
         }
-        if (ts.isPropertyAccessExpression(node)) {
+
+        if (ts.isVariableDeclarationList(node)) {
+            for (const declaration of node.declarations) {
+                const varName = declaration.name.getText()
+
+                if (declaration.initializer) {
+                    functionVisit(declaration.initializer, module, nsPath, varTable)
+                }
+                varTable.delete(varName)
+            }
+            return
+        } else if (ts.isPropertyAccessExpression(node)) {
         } else if (ts.isIdentifier(node)) {
             const name = node.getText()
             if (varTable.has(name)) {
