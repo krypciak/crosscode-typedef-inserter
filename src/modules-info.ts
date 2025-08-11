@@ -14,6 +14,7 @@ export interface Function {
         type: string
         isOptional: boolean
     }[]
+    renameTo?: string
 }
 export interface VarList {
     fields: Record<string, Field>
@@ -132,10 +133,14 @@ export async function getModulesInfo(typedefModulesPath: string) {
                     isOptional: !!a.questionToken,
                 }
             })
+            const comments = ts.getJSDocCommentsAndTags(node).map(a => a.getText())
+            let renameTo = comments.find(text => text.startsWith('/** RENAME: '))
+            if (renameTo) renameTo = renameTo.substring('/** RENAME: '.length, renameTo.length - '*/'.length).trim()
+
             if (args.length > 0 && args[0].name == 'this') args.splice(0, 1)
             const nsPath = nsStack.join('.')
             typedefModuleRecord[module][nsPath] ??= defVarList()
-            typedefModuleRecord[module][nsPath].functions[name] = { returnType, args }
+            typedefModuleRecord[module][nsPath].functions[name] = { returnType, args, renameTo }
         } else if (ts.isConstructSignatureDeclaration(node)) {
             const args: Function['args'] = node.parameters.map(a => {
                 let name = a.name.getText()

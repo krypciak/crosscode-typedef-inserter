@@ -23,7 +23,7 @@ function getIndentStyleOfFile(lines: string[]): IndentStyle {
         if (spaces != 0) assert(tabs == 0)
 
         if (tabs != 0) return 'tab'
-        if (spaces != 0) {
+        if (spaces != 0 && spaces != lastIndent) {
             if (lastIndent) {
                 const diff = Math.abs(lastIndent - spaces)
                 if (diff == 2) return '2space'
@@ -246,7 +246,7 @@ export async function getTypeInjectsAndTypedStats(
         const injectIntoFunction = (
             nsPath: string,
             name: string,
-            right: ts.FunctionExpression | ts.MethodDeclaration | ts.ArrowFunction
+            right: ts.FunctionExpression | ts.MethodDeclaration | ts.ArrowFunction | ts.FunctionDeclaration
         ) => {
             const varList: VarList = typedefModuleRecord[module][nsPath]
 
@@ -257,6 +257,15 @@ export async function getTypeInjectsAndTypedStats(
                 typedStats.functions[type ? 'typed' : 'untyped']++
 
                 if (generateInjects && type) {
+                    if (type.renameTo) {
+                        changeQueue.push({
+                            operation: 'rename',
+                            from: name,
+                            to: type.renameTo,
+                            pos: right.name!.pos + 1,
+                        })
+                    }
+
                     const argNames = right.parameters.map(a => a.name.getText())
                     const len = Math.min(argNames.length, type.args.length)
                     if (len != type.args.length && name == 'init') return
@@ -297,6 +306,11 @@ export async function getTypeInjectsAndTypedStats(
                     } else {
                         functionNodes = right.body!.statements
                     }
+                    for (const origFuncName in localFunctionsToRename) {
+                        if (!varTable.has(origFuncName)) {
+                            varTable.set(origFuncName, localFunctionsToRename[origFuncName].renameTo!)
+                        }
+                    }
                     for (const statement of functionNodes) {
                         functionVisit(statement, module, nsPath, varTable)
                     }
@@ -304,6 +318,10 @@ export async function getTypeInjectsAndTypedStats(
                 nextVisit = false
             }
         }
+
+        const localFunctionsToRename = Object.fromEntries(
+            Object.entries(typedefModuleRecord[module]['']?.functions ?? {}).filter(([_, { renameTo }]) => renameTo)
+        )
 
         let nextVisit = true
 
@@ -404,6 +422,8 @@ export async function getTypeInjectsAndTypedStats(
             }
         } else if (ts.isFunctionExpression(node) || ts.isArrowFunction(node)) {
             nextVisit = false
+        } else if (ts.isFunctionDeclaration(node)) {
+            injectIntoFunction(nsStack.join('.'), node.name!.getText(), node)
         }
         if (nextVisit) ts.forEachChild(node, node => visit(node, module, [...nsStack]))
     }
@@ -459,6 +479,7 @@ export async function getTypeInjectsAndTypedStats(
                 }
             }
         }
+
         node.getChildren()
             .slice(childOffset)
             .forEach(node => functionVisit(node, module, nsPath, varTable))
