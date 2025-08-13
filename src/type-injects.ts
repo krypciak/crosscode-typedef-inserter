@@ -63,7 +63,8 @@ async function readModuleIndentStyles(typedefModuleList: string[], typedefModule
     const typedefModulesIndentStyles: Map<string, IndentStyle> = new Map(
         await Promise.all(
             typedefModuleList.map(async module => {
-                const str = await fs.promises.readFile(typedefModulesPath + '/' + module + '.d.ts', 'utf8')
+                const path = typedefModulesPath + (module == 'impact-core' ? '/..' : '') + '/' + module + '.d.ts'
+                const str = await fs.promises.readFile(path, 'utf8')
                 return [module, getIndentStyleOfFile(str.split('\n'))] as [string, IndentStyle]
             })
         )

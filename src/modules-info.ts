@@ -35,12 +35,14 @@ export async function getModulesInfo(typedefModulesPath: string) {
 
     let typedefModuleRecord: Record<string, Record<string, VarList>> = {}
     for (const module of typedefModuleList) typedefModuleRecord[module] = {}
+    typedefModuleRecord['impact-core'] = {}
 
     const classPathToModule: Record<string, string> = {}
 
     console.log('reading from typedefs...')
 
     const files = typedefModuleList.map(a => `${typedefModulesPath}/${a}`)
+    files.push(`${typedefModulesPath}/../impact-core.d.ts`)
     const program = ts.createProgram(files, {
         target: ts.ScriptTarget.ES2015,
         module: ts.ModuleKind.CommonJS,
@@ -50,7 +52,7 @@ export async function getModulesInfo(typedefModulesPath: string) {
 
     for (const sourceFile of program.getSourceFiles()) {
         const baseName = path.basename(sourceFile.fileName)
-        if (!(baseName.startsWith('game.') || baseName.startsWith('impact.'))) continue
+        if (!(baseName.startsWith('game') || baseName.startsWith('impact'))) continue
 
         const module = baseName.slice(0, -5)
         ts.forEachChild(sourceFile, node => visit(module, node, []))

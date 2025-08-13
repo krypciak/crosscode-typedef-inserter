@@ -56,6 +56,6 @@ async function run() {
         statToStr('total         ', { typed: new Array(allTyped), untyped: new Array(allUntyped) })
     console.log(text)
 
-    // console.log(typedStats.functions.untyped.map(([module, path]) => `${path.padEnd(80)} ${module}`).join('\n'))
+    // console.log(typedStats.localFunctions.untyped.map(([module, path]) => `${path.padEnd(80)} ${module}`).join('\n'))
 }
 await run()
