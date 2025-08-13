@@ -229,6 +229,11 @@ export async function getTypeInjectsAndTypedStats(
         }
     }
     function getFunction(nsPath: string, varList: VarList, name: string): Function | undefined {
+        if (name == 'staticInstantiate')
+            return {
+                args: [],
+                returnType: 'Nullable<this>',
+            }
         return getFromVarListRecursive(nsPath, varList, 'functions', name)
     }
     function getField(nsPath: string, varList: VarList, name: string): Field | undefined {
