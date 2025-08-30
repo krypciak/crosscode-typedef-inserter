@@ -344,6 +344,8 @@ export async function getTypeInjectsAndTypedStats(
             let name = ts.isBinaryExpression(node) ? node.left.getText() : node.name.getText()
             const right = ts.isBinaryExpression(node) ? node.right : node.initializer!
 
+            name = name.replaceAll(/\['(.*)'\]/g, '.$1')
+
             if (right.getChildCount() == 4 && right.getChildren()[0].getText().includes('extend')) {
                 // class extend
                 nsStack.push(name)
