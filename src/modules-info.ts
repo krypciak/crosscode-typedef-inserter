@@ -100,8 +100,12 @@ export async function getModulesInfo(typedefModulesPath: string) {
             typedefModuleRecord[module][nsPath] ??= defVarList()
             typedefModuleRecord[module][nsPath].fields[name] = { type, isOptional: !!node.questionToken }
 
-            const potentialInterfacePath = nsStack.slice(0, -1).join('.') + '.' + type
-            const potentialInterface = typedefModuleRecord[module][potentialInterfacePath]
+            let potentialInterfacePath = type
+            let potentialInterface = typedefModuleRecord[module][potentialInterfacePath]
+            if (!potentialInterface) {
+                potentialInterfacePath = nsStack.slice(0, -1).join('.') + '.' + type
+                potentialInterface = typedefModuleRecord[module][potentialInterfacePath]
+            }
             if (potentialInterface) {
                 const newNsPath = nsPath + '.' + name
                 typedefModuleRecord[module][newNsPath] ??= defVarList()
