@@ -19,7 +19,7 @@ function applyLebabToCode(origCode: string) {
         'arrow',
         'arrow-return',
         'let',
-        'default-param',
+        // 'default-param',
         // 'destruct-param',
         'arg-spread',
         'arg-rest',
