@@ -38,7 +38,7 @@ Automated script:
 ```bash
 #/bin/sh
 set -e
-game_compied_js_path="MY_CROSSCODE_DIR/assets/js/game.compiled.js"
+game_compiled_js_path="MY_CROSSCODE_DIR/assets/js/game.compiled.js"
 
 git clone https://github.com/krypciak/crosscode-typedef-inserter
 cd crosscode-typedef-inserter
