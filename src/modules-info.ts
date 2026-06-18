@@ -128,9 +128,10 @@ export async function getModulesInfo(typedefModulesPath: string) {
             classPathToModule[nsPath] = module
             if (node.heritageClauses && node.heritageClauses.length > 0) {
                 for (const type of node.heritageClauses![0].types) {
-                    const typeStr = type.getText()
+                    let typeStr = type.getText()
                     typedefModuleRecord[module][nsPath] ??= defVarList()
                     if (!typeStr.startsWith('ImpactClass')) {
+                        typeStr = typeStr.replace(/<.*>/g, '')
                         typedefModuleRecord[module][nsPath].parents.push(typeStr)
                     }
                 }
