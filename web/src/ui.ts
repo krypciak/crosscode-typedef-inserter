@@ -21,7 +21,6 @@ function createEditor(parent: HTMLElement, editable: boolean, doc: string = ''):
                 basicSetup,
                 javascript(),
                 oneDark,
-                EditorView.editable.of(editable),
                 EditorState.readOnly.of(!editable),
                 EditorView.theme({
                     '&': { height: '100%' },
