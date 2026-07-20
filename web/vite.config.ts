@@ -17,6 +17,9 @@ export default defineConfig({
             perf_hooks: path.resolve(dirname, './src/perf-hooks-shim.ts'),
         },
     },
+    build: {
+        minify: false,
+    },
     server: {
         proxy: {
             '/ultimate-crosscode-typedefs.zip': {
