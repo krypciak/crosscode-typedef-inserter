@@ -102,7 +102,7 @@ runBtn.addEventListener('click', () => run())
 
 clearBtn.addEventListener('click', async () => {
     appendConsole('[ui] clearing cache...')
-    for await (const file of root.values()) {
+    for await (const file of (root as any).values()) {
         await root.removeEntry(file.name, { recursive: true })
     }
     appendConsole('[ui] cache cleared, reloading...')

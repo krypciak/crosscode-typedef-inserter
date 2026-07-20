@@ -66,6 +66,7 @@ export async function run() {
         await deleteLebabCacheIfCorrupted()
 
         await setupTypedefsRepo()
+        appendConsole('running crosscode-typedef-inserter')
 
         const { run: runIndex } = await import('../../src/index.ts')
         await runIndex()

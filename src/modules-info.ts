@@ -57,7 +57,9 @@ export async function getModulesInfo(typedefModulesPath: string) {
         const module = baseName.slice(0, -5)
         ts.forEachChild(sourceFile, node => visit(module, node, []))
     }
-    fs.promises.writeFile('typedefs.json', JSON.stringify(typedefModuleRecord, null, 4))
+    try {
+        await fs.promises.writeFile('typedefs.json', JSON.stringify(typedefModuleRecord, null, 4))
+    } catch {}
 
     return { typedefModuleRecord, classPathToModule }
 
