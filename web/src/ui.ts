@@ -2,7 +2,7 @@ import { EditorView, basicSetup } from 'codemirror'
 import { EditorState } from '@codemirror/state'
 import { javascript } from '@codemirror/lang-javascript'
 import { oneDark } from '@codemirror/theme-one-dark'
-import { run } from './main'
+import { root, run } from './main'
 
 const consoleMount = document.querySelector<HTMLDivElement>('#console-output')!
 const inputMount = document.querySelector<HTMLDivElement>('#input-code')!
@@ -11,6 +11,7 @@ const uploadBtn = document.querySelector<HTMLButtonElement>('#upload-btn')!
 const fileInput = document.querySelector<HTMLInputElement>('#file-input')!
 const downloadBtn = document.querySelector<HTMLButtonElement>('#download-btn')!
 export const runBtn = document.querySelector<HTMLButtonElement>('#run-btn')!
+const clearBtn = document.querySelector<HTMLButtonElement>('#clear-btn')!
 
 function createEditor(parent: HTMLElement, editable: boolean, doc: string = ''): EditorView {
     return new EditorView({
@@ -98,3 +99,12 @@ downloadBtn.addEventListener('click', () => {
 })
 
 runBtn.addEventListener('click', () => run())
+
+clearBtn.addEventListener('click', async () => {
+    appendConsole('[ui] clearing cache...')
+    for await (const file of root.values()) {
+        await root.removeEntry(file.name, { recursive: true })
+    }
+    appendConsole('[ui] cache cleared, reloading...')
+    location.reload()
+})
