@@ -1,0 +1,25 @@
+{
+    "name": "crosscode-typedef-inserter-web",
+    "private": true,
+    "version": "0.0.0",
+    "type": "module",
+    "scripts": {
+        "dev": "vite",
+        "build": "tsc && vite build",
+        "preview": "vite preview"
+    },
+    "devDependencies": {
+        "@types/path-browserify": "^1.0.3",
+        "crosscode-web": "krypciak/crosscode-web",
+        "fflate": "^0.8.3",
+        "path-browserify": "^1.0.1",
+        "typescript": "^7.0.0",
+        "vite": "^8.1.5",
+        "web-nwjs-spoofer": "krypciak/web-nwjs-spoofer"
+    },
+    "dependencies": {
+        "@jspm/core": "^2.1.0",
+        "@zenfs/core": "^2.5.7",
+        "@zenfs/dom": "^1.2.9"
+    }
+}

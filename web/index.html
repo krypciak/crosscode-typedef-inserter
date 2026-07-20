@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <!-- <link rel="icon" type="image/svg+xml" href="/favicon.svg" /> -->
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>crosscode-typedef-inserter-web</title>
+    </head>
+    <body>
+        <main id="app">
+            <h1>crosscode typedef inserter</h1>
+
+            <section>
+                <label>console output</label>
+                <textarea id="console-output" readonly rows="12"></textarea>
+            </section>
+
+            <section>
+                <label>game code (input)</label>
+                <textarea id="input-code" rows="12" placeholder="paste game code here..."></textarea>
+                <div class="row">
+                    <button id="upload-btn">upload file</button>
+                    <input type="file" id="file-input" hidden />
+                </div>
+            </section>
+
+            <section>
+                <div class="row">
+                    <button id="run-btn">run</button>
+                </div>
+            </section>
+
+            <section>
+                <label>typed game code (output)</label>
+                <textarea id="output-code" readonly rows="12"></textarea>
+                <div class="row">
+                    <button id="download-btn">download file</button>
+                </div>
+            </section>
+        </main>
+        <script type="module" src="/src/main.ts"></script>
+    </body>
+</html>

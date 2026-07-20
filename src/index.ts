@@ -5,7 +5,7 @@ import { injectIntoGameCompiled } from './inject-into-game-compiled'
 import { createGameCompiledProgram, getTypeInjectsAndTypedStats } from './type-injects'
 import { getModulesInfo } from './modules-info'
 
-async function run() {
+export async function run() {
     const typedefRepoPath = process.env['TYPEDEF_REPO']!
     let gameCompiledPath = process.env['GAME_COMPILED_JS']!
     const outGameCompiledPath = process.env['OUTPUT_GAME_COMPILED_JS']!
@@ -18,7 +18,11 @@ async function run() {
 
     const typedefModulesPath = `${typedefRepoPath}/modules`
     const { typedefModuleRecord, classPathToModule } = await getModulesInfo(typedefModulesPath)
-    await fs.promises.writeFile(outTypesPath, JSON.stringify(typedefModuleRecord, null, 4))
+    try {
+        await fs.promises.writeFile(outTypesPath, JSON.stringify(typedefModuleRecord, null, 4))
+    } catch (e) {
+        console.error('error while writing types:', e)
+    }
 
     const gameCompiledInfo = await createGameCompiledProgram(gameCompiledPath)
 
@@ -58,4 +62,3 @@ async function run() {
 
     // console.log(typedStats.localFunctions.untyped.map(([module, path]) => `${path.padEnd(80)} ${module}`).join('\n'))
 }
-await run()

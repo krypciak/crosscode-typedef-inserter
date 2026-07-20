@@ -2,7 +2,7 @@
     "name": "crosscode-typedef-inserter",
     "type": "module",
     "scripts": {
-        "start": "bun run --env-file=.env src/index.ts"
+        "start": "bun run --env-file=.env src/run.ts"
     },
     "dependencies": {
         "@types/bun": "^1.2.3",
