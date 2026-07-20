@@ -20,6 +20,7 @@ await fs.promises.mkdir('game-compiled', { recursive: true })
 
 const typedefsRepoPath = 'ultimate-crosscode-typedefs'
 const jsInputPath = 'game-compiled/game.compiled.js'
+const jsLebabPath = 'game-compiled/game.compiled.lebab.js'
 const jsOutputPath = 'game-compiled/game.compiled.typed.js'
 
 process.env['TYPEDEF_REPO'] = typedefsRepoPath
@@ -37,6 +38,16 @@ async function setupTypedefsRepo() {
     }
 }
 
+async function deleteLebabCacheIfCorrupted() {
+    try {
+        const stat = await fs.promises.stat(jsLebabPath)
+        if (stat.size < 10_000) {
+            await fs.promises.unlink(jsLebabPath)
+            appendConsole('[ui] removed corrupted lebab output (<10KB)')
+        }
+    } catch {}
+}
+
 export async function run() {
     runBtn.disabled = true
     try {
@@ -46,6 +57,8 @@ export async function run() {
             return
         }
         await fs.promises.writeFile(jsInputPath, inputCode)
+
+        await deleteLebabCacheIfCorrupted()
 
         await setupTypedefsRepo()
 
