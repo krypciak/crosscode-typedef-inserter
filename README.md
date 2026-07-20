@@ -54,6 +54,8 @@ cd ..
 cd ..
 sed -i 's/TYPEDEF_REPO=/TYPEDEF_REPO=.\/game-compiled\/ultimate-crosscode-typedefs/g' .env
 npm install
+npm install-scripts approve --all
+npm rebuild
 npm start
 # now the resulting file should be under
 # crosscode-typedef-inserter/game-compiled/game.compiled.typed.js
