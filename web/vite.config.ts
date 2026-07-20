@@ -17,6 +17,9 @@ export default defineConfig({
             perf_hooks: path.resolve(dirname, './src/perf-hooks-shim.ts'),
         },
     },
+    define: {
+        'process.env': 'process.env',
+    },
     build: {
         minify: false,
     },
