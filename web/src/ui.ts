@@ -23,7 +23,7 @@ function createEditor(parent: HTMLElement, editable: boolean, doc: string = ''):
                 EditorView.editable.of(editable),
                 EditorState.readOnly.of(!editable),
                 EditorView.theme({
-                    '&': { maxHeight: '300px' },
+                    '&': { height: '100%' },
                     '.cm-scroller': { overflow: 'auto' },
                 }),
             ],

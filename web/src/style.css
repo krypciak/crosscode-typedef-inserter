@@ -52,6 +52,9 @@
 
 body {
   margin: 0;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
 }
 
 h1,
@@ -157,182 +160,97 @@ code {
 }
 
 #app {
-  width: 1126px;
-  max-width: 100%;
+  width: 100%;
   margin: 0 auto;
-  text-align: center;
-  border-inline: 1px solid var(--border);
-  min-height: 100svh;
+  text-align: left;
+  height: 100vh;
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
-}
-
-#center {
-  display: flex;
-  flex-direction: column;
-  gap: 25px;
-  place-content: center;
-  place-items: center;
-  flex-grow: 1;
-
-  @media (max-width: 1024px) {
-    padding: 32px 20px 24px;
-    gap: 18px;
-  }
-}
-
-#next-steps {
-  display: flex;
-  border-top: 1px solid var(--border);
-  text-align: left;
-
-  & > div {
-    flex: 1 1 0;
-    padding: 32px;
-    @media (max-width: 1024px) {
-      padding: 24px 20px;
-    }
-  }
-
-  .icon {
-    margin-bottom: 16px;
-    width: 22px;
-    height: 22px;
-  }
-
-  @media (max-width: 1024px) {
-    flex-direction: column;
-    text-align: center;
-  }
-}
-
-#docs {
-  border-right: 1px solid var(--border);
-
-  @media (max-width: 1024px) {
-    border-right: none;
-    border-bottom: 1px solid var(--border);
-  }
-}
-
-#next-steps ul {
-  list-style: none;
-  padding: 0;
-  display: flex;
-  gap: 8px;
-  margin: 32px 0 0;
-
-  .logo {
-    height: 18px;
-  }
-
-  a {
-    color: var(--text-h);
-    font-size: 16px;
-    border-radius: 6px;
-    background: var(--social-bg);
-    display: flex;
-    padding: 6px 12px;
-    align-items: center;
-    gap: 8px;
-    text-decoration: none;
-    transition: box-shadow 0.3s;
-
-    &:hover {
-      box-shadow: var(--shadow);
-    }
-    .button-icon {
-      height: 18px;
-      width: 18px;
-    }
-  }
-
-  @media (max-width: 1024px) {
-    margin-top: 20px;
-    flex-wrap: wrap;
-    justify-content: center;
-
-    li {
-      flex: 1 1 calc(50% - 8px);
-    }
-
-    a {
-      width: 100%;
-      justify-content: center;
-      box-sizing: border-box;
-    }
-  }
-}
-
-#spacer {
-  height: 88px;
-  border-top: 1px solid var(--border);
-  @media (max-width: 1024px) {
-    height: 48px;
-  }
-}
-
-section {
-  padding: 16px 32px;
-  border-bottom: 1px solid var(--border);
-  text-align: left;
-}
-
-section label {
-  display: block;
-  font-weight: 600;
-  color: var(--text-h);
-  margin-bottom: 6px;
-  font-size: 14px;
-}
-
-section .editor-mount {
-  border: 1px solid var(--border);
-  border-radius: 4px;
   overflow: hidden;
 }
 
-section .row {
-  margin-top: 8px;
+.panels {
   display: flex;
-  gap: 8px;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
 }
 
-section button {
+.panel {
+  flex: 1;
+  padding: 4px 6px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.panel + .panel {
+  border-left: 1px solid var(--border);
+}
+
+.console-section {
+  padding: 4px 6px;
+  flex: 0 0 320px;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.console-section .editor-mount {
+  flex: 1;
+  min-height: 0;
+}
+
+label {
+  display: block;
+  font-weight: 600;
+  color: var(--text-h);
+  margin-bottom: 2px;
+  font-size: 12px;
+}
+
+.editor-mount {
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.editor-mount .cm-editor {
+  height: 100%;
+  min-width: 0;
+}
+
+.editor-mount .cm-scroller {
+  overflow-x: auto;
+}
+
+.panel .editor-mount {
+  flex: 1;
+  min-height: 0;
+}
+
+.row {
+  margin-top: 4px;
+  display: flex;
+  gap: 4px;
+}
+
+button {
   font-family: var(--sans);
-  font-size: 14px;
-  padding: 6px 16px;
+  font-size: 22px;
+  padding: 4px 14px;
   border: 1px solid var(--accent-border);
-  border-radius: 4px;
+  border-radius: 3px;
   background: var(--accent-bg);
   color: var(--accent);
   cursor: pointer;
 }
 
-section button:hover {
+button:hover {
   background: var(--accent);
   color: var(--bg);
-}
-
-.ticks {
-  position: relative;
-  width: 100%;
-
-  &::before,
-  &::after {
-    content: '';
-    position: absolute;
-    top: -4.5px;
-    border: 5px solid transparent;
-  }
-
-  &::before {
-    left: 0;
-    border-left-color: var(--border);
-  }
-  &::after {
-    right: 0;
-    border-right-color: var(--border);
-  }
 }
