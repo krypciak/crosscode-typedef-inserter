@@ -1,17 +1,47 @@
+import { EditorView, basicSetup } from 'codemirror'
+import { EditorState } from '@codemirror/state'
+import { javascript } from '@codemirror/lang-javascript'
+import { oneDark } from '@codemirror/theme-one-dark'
 import { run } from './main'
 
-const consoleEl = document.querySelector<HTMLTextAreaElement>('#console-output')!
-const inputCodeEl = document.querySelector<HTMLTextAreaElement>('#input-code')!
-const outputCodeEl = document.querySelector<HTMLTextAreaElement>('#output-code')!
+const consoleMount = document.querySelector<HTMLDivElement>('#console-output')!
+const inputMount = document.querySelector<HTMLDivElement>('#input-code')!
+const outputMount = document.querySelector<HTMLDivElement>('#output-code')!
 const uploadBtn = document.querySelector<HTMLButtonElement>('#upload-btn')!
 const fileInput = document.querySelector<HTMLInputElement>('#file-input')!
 const downloadBtn = document.querySelector<HTMLButtonElement>('#download-btn')!
 export const runBtn = document.querySelector<HTMLButtonElement>('#run-btn')!
 
+function createEditor(parent: HTMLElement, editable: boolean, doc: string = ''): EditorView {
+    return new EditorView({
+        state: EditorState.create({
+            doc,
+            extensions: [
+                basicSetup,
+                javascript(),
+                oneDark,
+                EditorView.editable.of(editable),
+                EditorState.readOnly.of(!editable),
+                EditorView.theme({
+                    '&': { maxHeight: '300px' },
+                    '.cm-scroller': { overflow: 'auto' },
+                }),
+            ],
+        }),
+        parent,
+    })
+}
+
+const consoleEditor = createEditor(consoleMount, false)
+const inputEditor = createEditor(inputMount, true)
+const outputEditor = createEditor(outputMount, false)
+
 export function appendConsole(...args: any[]) {
     const line = args.map(a => (typeof a === 'object' ? JSON.stringify(a, null, 2) : String(a))).join(' ') + '\n'
-    consoleEl.value += line
-    consoleEl.scrollTop = consoleEl.scrollHeight
+    consoleEditor.dispatch({
+        changes: { from: consoleEditor.state.doc.length, insert: line },
+    })
+    consoleEditor.dispatch({ effects: EditorView.scrollIntoView(consoleEditor.state.doc.length) })
 }
 
 const origLog = console.log
@@ -37,18 +67,23 @@ uploadBtn.addEventListener('click', () => fileInput.click())
 fileInput.addEventListener('change', async () => {
     const file = fileInput.files?.[0]
     if (!file) return
-    inputCodeEl.value = await file.text()
+    inputEditor.dispatch({
+        changes: { from: 0, to: inputEditor.state.doc.length, insert: await file.text() },
+    })
     appendConsole(`[ui] loaded ${file.name} (${file.size} bytes)`)
 })
+
 export function getCodeInputString() {
-    return inputCodeEl.value.trim()
+    return inputEditor.state.doc.toString().trim()
 }
 export function writeToOuptutTextField(text: string) {
-    outputCodeEl.value = text
+    outputEditor.dispatch({
+        changes: { from: 0, to: outputEditor.state.doc.length, insert: text },
+    })
 }
 
 downloadBtn.addEventListener('click', () => {
-    const text = outputCodeEl.value
+    const text = outputEditor.state.doc.toString()
     if (!text) {
         appendConsole('[ui] nothing to download')
         return

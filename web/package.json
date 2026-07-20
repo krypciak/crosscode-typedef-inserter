@@ -18,8 +18,12 @@
         "web-nwjs-spoofer": "krypciak/web-nwjs-spoofer"
     },
     "dependencies": {
+        "@codemirror/lang-javascript": "^6.2.5",
+        "@codemirror/state": "^6.7.1",
+        "@codemirror/theme-one-dark": "^6.1.3",
         "@jspm/core": "^2.1.0",
         "@zenfs/core": "^2.5.7",
-        "@zenfs/dom": "^1.2.9"
+        "@zenfs/dom": "^1.2.9",
+        "codemirror": "^6.0.2"
     }
 }
