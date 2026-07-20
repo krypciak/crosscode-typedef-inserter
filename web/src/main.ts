@@ -61,6 +61,7 @@ export async function run() {
             appendConsole('[ui] no input provided')
             return
         }
+        appendConsole('[ui] running...')
         await fs.promises.writeFile(jsInputPath, inputCode)
 
         await deleteLebabCacheIfCorrupted()
