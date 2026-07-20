@@ -14,6 +14,7 @@ export default defineConfig({
             assert: path.resolve(dirname, './src/assert-shim.ts'),
             path: require.resolve('path-browserify'),
             os: require.resolve('web-nwjs-spoofer/src/os-shim.ts'),
+            perf_hooks: path.resolve(dirname, './src/perf-hooks-shim.ts'),
         },
     },
     build: {
