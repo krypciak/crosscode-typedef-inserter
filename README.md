@@ -21,6 +21,11 @@
 
 ## Running
 
+> [!TIP]
+> I recommend using the online version: https://crosscode-code.krypek.cc
+
+Local instructions:
+
 Edit the `.env` file to include paths. An example `.env` can look like:  
 ```bash
 TYPEDEF_REPO=./game-compiled/ultimate-crosscode-typedefs
