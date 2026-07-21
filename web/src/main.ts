@@ -8,8 +8,12 @@ import { fs, configure } from '@zenfs/core'
 import { WebAccess } from '@zenfs/dom'
 import { appendConsole, getCodeInputString, runBtn, writeToOuptutTextField } from './ui.ts'
 
-if (navigator.userAgent.includes('Firefox')) {
-    appendConsole('[ui] WARNING: Firefox may have poor performance. Consider using Chromium-based browser.')
+if (/Mobi|Android|iPad|iPhone/i.test(navigator.userAgent)) {
+    appendConsole('[ui] WARNING: Mobile devices have very poor performance. Use a desktop Chromium-based browser for best results.')
+} else {
+    if (navigator.userAgent.includes('Firefox')) {
+        appendConsole('[ui] WARNING: Firefox may have poor performance. Consider using Chromium-based browser.')
+    }
 }
 
 export const root = await navigator.storage.getDirectory()
