@@ -41,7 +41,8 @@ export function appendConsole(...args: any[]) {
     consoleEditor.dispatch({
         changes: { from: consoleEditor.state.doc.length, insert: line },
     })
-    consoleEditor.dispatch({ effects: EditorView.scrollIntoView(consoleEditor.state.doc.length) })
+    const scroller = consoleEditor.dom.querySelector('.cm-scroller')
+    if (scroller) scroller.scrollTop = scroller.scrollHeight
 }
 
 const origLog = console.log
