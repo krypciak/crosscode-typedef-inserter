@@ -168,6 +168,19 @@ code {
   flex-direction: column;
   box-sizing: border-box;
   overflow: hidden;
+  position: relative;
+}
+
+header {
+  position: absolute;
+  top: 0;
+  right: 0;
+  padding: 6px 8px;
+  z-index: 10;
+}
+
+.gh-badge img {
+  height: 20px;
 }
 
 .panels {
