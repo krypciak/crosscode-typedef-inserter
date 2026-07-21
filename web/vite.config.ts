@@ -6,7 +6,7 @@ import { fileURLToPath } from 'url'
 const require = createRequire(import.meta.url)
 const dirname = path.dirname(fileURLToPath(import.meta.url))
 
-export default defineConfig({
+export default defineConfig(({ command }) => ({
     resolve: {
         alias: {
             fs: require.resolve('@zenfs/core'),
@@ -17,9 +17,7 @@ export default defineConfig({
             perf_hooks: path.resolve(dirname, './src/perf-hooks-shim.ts'),
         },
     },
-    define: {
-        'process.env': 'process.env',
-    },
+    define: command === 'build' ? { 'process.env': 'process.env' } : undefined,
     build: {
         minify: false,
     },
@@ -32,4 +30,4 @@ export default defineConfig({
             },
         },
     },
-})
+}))
