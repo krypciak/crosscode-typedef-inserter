@@ -160,6 +160,10 @@ export async function getTypeInjectsAndTypedStats(
 
     return { changeQueue, typedStats }
 
+    function getVarList(module: string, nsPath: string): VarList | undefined {
+        return typedefModuleRecord[module][nsPath]
+    }
+
     function rootVisit(node: ts.Node, depth: number = 0) {
         if (ts.isCallExpression(node)) {
             const expr = node.expression.getText()
@@ -191,7 +195,7 @@ export async function getTypeInjectsAndTypedStats(
 
     function checkAndReplaceWithRecord(module: string, nsPath: string, type: Field) {
         // check if is an enum
-        const varList: VarList = typedefModuleRecord[module][nsPath]
+        const varList = getVarList(module, nsPath)
         if (varList && Object.keys(varList.functions).length == 0 && Object.keys(varList.fields).length >= 2) {
             const firstType = Object.values(varList.fields)[0].type
             if (Object.values(varList.fields).every(a => a.type == firstType)) {
@@ -222,7 +226,7 @@ export async function getTypeInjectsAndTypedStats(
             }
 
             if (!module) continue
-            const newVarList = typedefModuleRecord[module][parentPath]
+            const newVarList = getVarList(module, parentPath)
             if (!newVarList) continue
             const ret = getFromVarListRecursive(parentPath, newVarList, type, name, depth + 1)
             if (ret) return ret
@@ -256,7 +260,7 @@ export async function getTypeInjectsAndTypedStats(
             name: string,
             right: ts.FunctionExpression | ts.MethodDeclaration | ts.ArrowFunction | ts.FunctionDeclaration
         ) => {
-            const varList: VarList = typedefModuleRecord[module][nsPath]
+            const varList = getVarList(module, nsPath)
 
             const type = varList ? getFunction(nsPath, varList, name) : undefined
             typedStats[
@@ -332,7 +336,7 @@ export async function getTypeInjectsAndTypedStats(
         }
 
         const localFunctionsToRename = Object.fromEntries(
-            Object.entries(typedefModuleRecord[module]['']?.functions ?? {}).filter(([_, { renameTo }]) => renameTo)
+            Object.entries(getVarList(module, '')?.functions ?? {}).filter(([_, { renameTo }]) => renameTo)
         )
 
         let nextVisit = true
@@ -351,7 +355,7 @@ export async function getTypeInjectsAndTypedStats(
                 nsStack.push(name)
 
                 const nsPath = nsStack.join('.')
-                const varList: VarList = typedefModuleRecord[module][nsPath]
+                const varList = getVarList(module, nsPath)
                 typedStats.classes[varList ? 'typed' : 'untyped'].push([module, name])
                 // if (!varList) console.log(nsPath, '\t\t\t\t', module)
             } else if (
@@ -384,7 +388,7 @@ export async function getTypeInjectsAndTypedStats(
             let right = node.getChildren()[2]
             if (ts.isMethodDeclaration(node)) right = node
 
-            const varList: VarList = typedefModuleRecord[module][nsPath]
+            const varList = getVarList(module, nsPath)
 
             if (ts.isFunctionExpression(right) || ts.isMethodDeclaration(right)) {
                 injectIntoFunction(nsPath, name, right)
@@ -442,6 +446,7 @@ export async function getTypeInjectsAndTypedStats(
         } else if (ts.isFunctionDeclaration(node)) {
             injectIntoFunction(nsStack.join('.'), node.name!.getText(), node)
         }
+
         if (nextVisit) ts.forEachChild(node, node => visit(node, module, [...nsStack]))
     }
 
