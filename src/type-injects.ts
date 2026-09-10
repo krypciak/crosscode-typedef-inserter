@@ -147,6 +147,15 @@ export async function getTypeInjectsAndTypedStats(
 
     getClassAliases(classPathToModule, typedefModuleRecord)
 
+    const nsPathToModule = Object.fromEntries(
+        Object.entries(typedefModuleRecord).flatMap(([module, rec]) =>
+            Object.entries(rec).map(([nsPath, _varList]) => [nsPath, module] as const)
+        )
+    )
+    for (const nsPath in classPathToModule) {
+        nsPathToModule[nsPath] = classPathToModule[nsPath]
+    }
+
     const { typedefModulesIndentStyles } = generateInjects
         ? await readModuleIndentStyles(Object.keys(typedefModuleRecord), typedefModulesPath)
         : { typedefModulesIndentStyles: new Map<string, IndentStyle>() }
@@ -161,7 +170,11 @@ export async function getTypeInjectsAndTypedStats(
     return { changeQueue, typedStats }
 
     function getVarList(module: string, nsPath: string): VarList | undefined {
-        return typedefModuleRecord[module][nsPath]
+        let varList: VarList | undefined = typedefModuleRecord[module][nsPath]
+        if (varList) return varList
+        module = nsPathToModule[nsPath]
+        if (module) varList = typedefModuleRecord[module][nsPath]
+        return varList
     }
 
     function rootVisit(node: ts.Node, depth: number = 0) {
