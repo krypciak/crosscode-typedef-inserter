@@ -11,13 +11,13 @@ export async function runTypedefsInserter({
     code: string
     runPrettierAndLebab?: boolean
     typedefsFiles: Record<string, string>
-    onPartialCodeTransform?: (code: string) => void
+    onPartialCodeTransform?: (code: string, stage: 'postPrettier' | 'postLebab') => void
 }) {
     if (runPrettierAndLebab) {
         code = await runPrettier(code)
-        onPartialCodeTransform(code)
+        onPartialCodeTransform(code, 'postPrettier')
         code = await runLebabPasses(code)
-        onPartialCodeTransform(code)
+        onPartialCodeTransform(code, 'postLebab')
     }
 
     const { typedefModuleRecord, classPathToModule } = await getModulesInfo(typedefsFiles)
