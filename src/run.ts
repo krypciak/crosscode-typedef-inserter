@@ -25,7 +25,10 @@ async function getTypedefsFiles() {
     return Object.fromEntries(
         await Promise.all(
             (await fs.promises.readdir(typedefRepoPath, { recursive: true }))
-                .filter(f => !f.startsWith('node_modules') && (f.endsWith('.ts') || f.endsWith('.js')))
+                .filter(
+                    f =>
+                        !f.startsWith('node_modules') && (f.endsWith('.ts') || f.endsWith('.js') || f.endsWith('.json'))
+                )
                 .map(async f => [f, await fs.promises.readFile(typedefRepoPath + '/' + f, 'utf8')] as const)
         )
     )
