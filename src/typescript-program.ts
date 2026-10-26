@@ -29,6 +29,7 @@ export class TypescriptProgram {
                 target: ts.ScriptTarget.ES5,
                 module: ts.ModuleKind.CommonJS,
                 allowJs: true,
+                configFilePath: 'tsconfig.json',
             },
             {
                 fileExists: f => !!files[f],

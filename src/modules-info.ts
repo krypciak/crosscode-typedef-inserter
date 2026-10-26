@@ -40,6 +40,7 @@ export async function getModulesInfo(typedefsFiles: Record<string, string>) {
     const typedefModuleList = Object.keys(typedefsFiles)
         .filter(f => f.startsWith('modules'))
         .map(f => f.slice('modules/'.length, -'.d.ts'.length))
+        .filter(Boolean)
 
     let typedefModuleRecord: Record<string, Record<string, VarList>> = {}
     for (const module of typedefModuleList) typedefModuleRecord[module] = {}
