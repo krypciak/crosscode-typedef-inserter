@@ -1,7 +1,6 @@
 import * as fs from 'fs'
 
 import { assert } from './assert'
-import { combineChangeQueue } from './change-queue'
 import { createGameCompiledProgram, getTypeInjectsAndTypedStats } from './type-injects'
 import { getModulesInfo } from './modules-info'
 import { runLebabPasses, runPrettier } from './lebab'
@@ -55,7 +54,7 @@ export async function run() {
         gameCompiledInfo
     )
 
-    const outputCode = combineChangeQueue(code, changeQueue)
+    const outputCode = changeQueue.combine(code)
     await fs.promises.writeFile(outGameCompiledPath, outputCode, 'utf8')
 
     console.log('all done')

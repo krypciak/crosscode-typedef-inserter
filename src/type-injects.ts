@@ -1,5 +1,5 @@
 import ts, { SyntaxKind } from 'typescript'
-import { type ChangeQueue } from './change-queue'
+import { ChangeQueue } from './change-queue'
 import { assert } from './assert'
 import type { Field, VarList, Function } from './modules-info'
 import { TypescriptProgram } from './typescript-program'
@@ -127,7 +127,7 @@ export async function getTypeInjectsAndTypedStats(
     gameCompiledInfo: Awaited<ReturnType<typeof createGameCompiledProgram>>,
     generateInjects: boolean = true
 ) {
-    const changeQueue: ChangeQueue = []
+    const changeQueue = new ChangeQueue()
 
     const typedStats = {
         fields: { typed: [] as [string, string][], untyped: [] as [string, string][] },
@@ -277,8 +277,7 @@ export async function getTypeInjectsAndTypedStats(
             if (type) {
                 if (generateInjects && type) {
                     if (type.renameTo) {
-                        changeQueue.push({
-                            operation: 'rename',
+                        changeQueue.rename({
                             from: name,
                             to: type.renameTo,
                             pos: right.name!.pos + 1,
@@ -296,21 +295,18 @@ export async function getTypeInjectsAndTypedStats(
 
                     for (let i = 0; i < len; i++) {
                         const to: string = varTable.get(argNames[i])!
-                        changeQueue.push({
-                            operation: 'rename',
+                        changeQueue.rename({
                             from: argNames[i],
                             to: to,
                             pos: right.parameters[i].getStart(),
                         })
-                        changeQueue.push({
-                            operation: 'inject',
+                        changeQueue.inject({
                             type: type.args[i].type,
                             pos: right.parameters[i].end,
                             isOptional: type.args[i].isOptional,
                         })
                     }
-                    changeQueue.push({
-                        operation: 'inject',
+                    changeQueue.inject({
                         type: type.returnType,
                         pos: right.body!.getStart() - 1,
                     })
@@ -372,8 +368,7 @@ export async function getTypeInjectsAndTypedStats(
                 const type: Field = { type: 'none' }
                 checkAndReplaceWithRecord(module, nsStack.join('.'), type)
                 if (type.type != 'none') {
-                    changeQueue.push({
-                        operation: 'inject',
+                    changeQueue.inject({
                         type: type.type,
                         pos: right.getChildren()[0].getStart() - 1,
                     })
@@ -435,8 +430,7 @@ export async function getTypeInjectsAndTypedStats(
                         }
 
                         const typeStr = sp.join('\n')
-                        changeQueue.push({
-                            operation: 'inject',
+                        changeQueue.inject({
                             type: typeStr,
                             pos: node.name!.end,
                             isOptional: type.isOptional,
@@ -495,8 +489,7 @@ export async function getTypeInjectsAndTypedStats(
                     if (sp[0] != node.getText()) rename = false
                 }
                 if (rename) {
-                    changeQueue.push({
-                        operation: 'rename',
+                    changeQueue.rename({
                         from: name,
                         to: varTable.get(name)!,
                         pos: node.getStart(),

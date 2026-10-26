@@ -1,28 +1,40 @@
 import { assert } from './assert'
 
-export type ChangeQueue = ({ pos: number } & (
+type Change = { pos: number } & (
     | { operation: 'inject'; type: string; isOptional?: boolean }
     | { operation: 'rename'; from: string; to: string }
-))[]
+)
+export class ChangeQueue {
+    private changeQueue: Change[] = []
 
-export function combineChangeQueue(code: string, changeQueue: ChangeQueue): string {
-    console.log('modifing code...')
-
-    const res: string[] = []
-    let i = 0
-    for (let obj of changeQueue) {
-        res.push(code.slice(i, obj.pos))
-        i = obj.pos
-
-        if (obj.operation == 'inject') {
-            const str = `/*${obj.isOptional ? '?' : ''}: ${obj.type}*/`
-            res.push(str)
-        } else if (obj.operation == 'rename') {
-            res.push(obj.to)
-            i += obj.from.length
-        } else assert(false)
+    inject(obj: Omit<Change & { operation: 'inject' }, 'operation'>) {
+        const change = obj as Change
+        change.operation = 'inject'
+        this.changeQueue.push(change)
     }
-    res.push(code.slice(i, code.length))
+    rename(obj: Omit<Change & { operation: 'rename' }, 'operation'>) {
+        const change = obj as Change
+        change.operation = 'rename'
+        this.changeQueue.push(change)
+    }
 
-    return res.join('')
+    combine(code: string): string {
+        const res: string[] = []
+        let i = 0
+        for (let obj of this.changeQueue) {
+            res.push(code.slice(i, obj.pos))
+            i = obj.pos
+
+            if (obj.operation == 'inject') {
+                const str = `/*${obj.isOptional ? '?' : ''}: ${obj.type}*/`
+                res.push(str)
+            } else if (obj.operation == 'rename') {
+                res.push(obj.to)
+                i += obj.from.length
+            } else assert(false)
+        }
+        res.push(code.slice(i, code.length))
+
+        return res.join('')
+    }
 }
