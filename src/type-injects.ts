@@ -3,6 +3,7 @@ import { ChangeQueue } from './change-queue'
 import { assert } from './assert'
 import type { Field, VarList, Function } from './modules-info'
 import { TypescriptProgram } from './typescript-program'
+import { TypedStats } from './typed-stats'
 
 type IndentStyle = 'tab' | '2space' | '4space'
 function getIndentStyleOfFile(lines: string[]): IndentStyle {
@@ -129,13 +130,7 @@ export async function getTypeInjectsAndTypedStats(
 ) {
     const changeQueue = new ChangeQueue()
 
-    const typedStats = {
-        fields: { typed: [] as [string, string][], untyped: [] as [string, string][] },
-        methods: { typed: [] as [string, string][], untyped: [] as [string, string][] },
-        functions: { typed: [] as [string, string][], untyped: [] as [string, string][] },
-        localFunctions: { typed: [] as [string, string][], untyped: [] as [string, string][] },
-        classes: { typed: [] as [string, string][], untyped: [] as [string, string][] },
-    }
+    const typedStats = new TypedStats()
 
     console.log('gathering all changes...')
 
