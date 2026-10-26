@@ -1,9 +1,8 @@
 import ts, { SyntaxKind } from 'typescript'
-import * as fs from 'fs'
-import * as path from 'path'
-import { type ChangeQueue } from './inject-into-game-compiled'
-import { assert } from './misc'
+import { type ChangeQueue } from './change-queue'
+import { assert } from './assert'
 import type { Field, VarList, Function } from './modules-info'
+import { TypescriptProgram } from './typescript-program'
 
 type IndentStyle = 'tab' | '2space' | '4space'
 function getIndentStyleOfFile(lines: string[]): IndentStyle {
@@ -59,32 +58,27 @@ function getIndentX(style: IndentStyle, count: number) {
     if (style == '4space') return '    '.repeat(count)
 }
 
-async function readModuleIndentStyles(typedefModuleList: string[], typedefModulesPath: string) {
+function readModuleIndentStyles(modulesList: string[], typedefsFiles: Record<string, string>) {
     const typedefModulesIndentStyles: Map<string, IndentStyle> = new Map(
-        await Promise.all(
-            typedefModuleList.map(async module => {
-                const path = typedefModulesPath + (module == 'impact-core' ? '/..' : '') + '/' + module + '.d.ts'
-                const str = await fs.promises.readFile(path, 'utf8')
-                return [module, getIndentStyleOfFile(str.split('\n'))] as [string, IndentStyle]
-            })
-        )
+        modulesList.map(module => {
+            const path = (module == 'impact-core' ? '' : 'modules/') + module + '.d.ts'
+            const str = typedefsFiles[path]
+            assert(str !== undefined)
+
+            return [module, getIndentStyleOfFile(str.split('\n'))] as [string, IndentStyle]
+        })
     )
     return { typedefModulesIndentStyles }
 }
 
-export async function createGameCompiledProgram(gameCompiledPath: string) {
-    const gameCompiledSplit: string[] = (await fs.promises.readFile(gameCompiledPath, 'utf8')).split('\n')
-    const program = ts.createProgram([gameCompiledPath], {
-        target: ts.ScriptTarget.ES5,
-        module: ts.ModuleKind.CommonJS,
-        allowJs: true,
-    })
-
-    program.getTypeChecker()
+export async function createGameCompiledProgram(code: string) {
+    const gameCompiledSplit: string[] = code.split('\n')
 
     const gameCompiledIndentStyle: IndentStyle = getIndentStyleOfFile(gameCompiledSplit)
 
-    return { program, gameCompiledIndentStyle, gameCompiledSplit, pathBase: path.basename(gameCompiledPath) }
+    const program = new TypescriptProgram({ ['game.compiled.js']: code })
+
+    return { program, gameCompiledIndentStyle, gameCompiledSplit }
 }
 
 function getClassAliases(
@@ -129,7 +123,7 @@ function getClassAliases(
 export async function getTypeInjectsAndTypedStats(
     classPathToModule: Record<string, string>,
     typedefModuleRecord: Record<string, Record<string, VarList>>,
-    typedefModulesPath: string,
+    typedefsFiles: Record<string, string>,
     gameCompiledInfo: Awaited<ReturnType<typeof createGameCompiledProgram>>,
     generateInjects: boolean = true
 ) {
@@ -157,15 +151,11 @@ export async function getTypeInjectsAndTypedStats(
     }
 
     const { typedefModulesIndentStyles } = generateInjects
-        ? await readModuleIndentStyles(Object.keys(typedefModuleRecord), typedefModulesPath)
+        ? readModuleIndentStyles(Object.keys(typedefModuleRecord), typedefsFiles)
         : { typedefModulesIndentStyles: new Map<string, IndentStyle>() }
 
-    for (const sourceFile of gameCompiledInfo.program.getSourceFiles()) {
-        const baseName = path.basename(sourceFile.fileName)
-        if (!baseName.startsWith(gameCompiledInfo.pathBase)) continue
-
-        ts.forEachChild(sourceFile, node => rootVisit(node))
-    }
+    const sourceFile = gameCompiledInfo.program.program.getSourceFiles()[0]
+    ts.forEachChild(sourceFile, node => rootVisit(node))
 
     return { changeQueue, typedStats }
 
@@ -390,7 +380,7 @@ export async function getTypeInjectsAndTypedStats(
                 }
             } else if (ts.isFunctionExpression(right) || ts.isArrowFunction(right)) {
                 const sp = name.split('.')
-                const funcName = sp.last()
+                const funcName = sp.at(-1)!
 
                 injectIntoFunction(sp.slice(0, -1).join('.'), funcName, right)
             }

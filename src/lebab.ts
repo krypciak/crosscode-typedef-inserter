@@ -1,25 +1,13 @@
-import * as lebab from 'lebab'
-import * as fs from 'fs'
-import { fileExists } from './misc'
-import * as prettier from 'prettier'
-import * as babelParser from 'prettier/plugins/babel'
-import * as estreeParser from 'prettier/plugins/estree'
-
 const yieldToMain = () => new Promise<void>(r => setTimeout(r, 0))
 
-export async function applyLebabToCode(origCode: string) {
-    let code = origCode
-
-    /* this has to split into multiple passes because of https://github.com/lebab/lebab/issues/205 */
-    console.log('running lebab pass 1...')
-    code = lebab.transform(code, ['multi-var']).code
-    await yieldToMain()
-    console.log('running lebab pass 2...')
-    code = lebab.transform(code, ['multi-var']).code
-    await yieldToMain()
-    // type res = { code: string; warnings: { type: string; line: number; msg: string }[] }
-    console.log('running lebab pass 3...')
-    code = lebab.transform(code, [
+function lebabPass1(code: string, lebab: typeof import('lebab')): string {
+    return lebab.transform(code, ['multi-var']).code
+}
+function lebabPass2(code: string, lebab: typeof import('lebab')): string {
+    return lebabPass1(code, lebab)
+}
+function lebabPass3(code: string, lebab: typeof import('lebab')): string {
+    return lebab.transform(code, [
         // 'class',
         'template',
         'arrow',
@@ -38,7 +26,27 @@ export async function applyLebabToCode(origCode: string) {
         // 'for-each',
         'includes',
     ]).code
+}
+
+export async function runLebabPasses(origCode: string) {
+    let code = origCode
+
+    const lebab = await import('lebab')
+
+    /* this has to split into multiple passes because of https://github.com/lebab/lebab/issues/205 */
+    console.log('running lebab pass 1...')
+    code = lebabPass1(code, lebab)
     await yieldToMain()
+
+    console.log('running lebab pass 2...')
+    code = lebabPass2(code, lebab)
+    await yieldToMain()
+
+    console.log('running lebab pass 3...')
+    code = lebabPass3(code, lebab)
+    await yieldToMain()
+
+    /* revert some code breaking code transforms */
     code = code.replace(/window\.ig\.Class = \(\) =\> \{\}/, 'window.ig.Class = function() {}')
     code = code.replace(/let g;(\s+if \(this.attackCounter \<= 3)/, 'var g;$1')
     code = code.replace(/new ig\.TileSheet\.createFromJson/g, 'ig.TileSheet.createFromJson')
@@ -46,9 +54,14 @@ export async function applyLebabToCode(origCode: string) {
     return code
 }
 
-async function runPrettier(code: string) {
+export async function runPrettier(code: string) {
+    const prettier = await import('prettier')
+    const babelParser = await import('prettier/plugins/babel')
+    const estreeParser = await import('prettier/plugins/estree')
+
     console.log('running prettier')
     await yieldToMain()
+
     const formattedCode = await prettier.format(code, {
         parser: 'babel',
         plugins: [babelParser, estreeParser],
@@ -64,16 +77,4 @@ async function runPrettier(code: string) {
         arrowParens: 'avoid',
     })
     return formattedCode
-}
-
-export async function applyLebab(gameCompiledPath: string): Promise<string> {
-    const outPath = './game-compiled/game.compiled.lebab.js'
-    if (!(await fileExists(outPath))) {
-        const origCode = await fs.promises.readFile(gameCompiledPath, 'utf8')
-        const formattedCode = await runPrettier(origCode)
-
-        const newCode = await applyLebabToCode(formattedCode)
-        await fs.promises.writeFile(outPath, newCode)
-    }
-    return outPath
 }

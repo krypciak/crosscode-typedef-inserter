@@ -1,6 +1,5 @@
-import * as fs from 'fs'
 import ts from 'typescript'
-import * as path from 'path'
+import { TypescriptProgram } from './typescript-program'
 
 type Type = string
 export interface Field {
@@ -30,8 +29,17 @@ function defVarList(): VarList {
     }
 }
 
-export async function getModulesInfo(typedefModulesPath: string) {
-    const typedefModuleList = (await fs.promises.readdir(typedefModulesPath)).map(a => a.slice(0, -5)).filter(Boolean)
+function basename(path: string): string {
+    path = path.replace(/\/+$/, '')
+    const lastSlash = path.lastIndexOf('/')
+    if (lastSlash == -1) return path
+    return path.substring(lastSlash + 1)
+}
+
+export async function getModulesInfo(typedefsFiles: Record<string, string>) {
+    const typedefModuleList = Object.keys(typedefsFiles)
+        .filter(f => f.startsWith('modules'))
+        .map(f => f.slice('modules/'.length, -'.d.ts'.length))
 
     let typedefModuleRecord: Record<string, Record<string, VarList>> = {}
     for (const module of typedefModuleList) typedefModuleRecord[module] = {}
@@ -41,25 +49,19 @@ export async function getModulesInfo(typedefModulesPath: string) {
 
     console.log('reading from typedefs...')
 
-    const files = typedefModuleList.map(a => `${typedefModulesPath}/${a}`)
-    files.push(`${typedefModulesPath}/../impact-core.d.ts`)
-    const program = ts.createProgram(files, {
-        target: ts.ScriptTarget.ES2015,
-        module: ts.ModuleKind.CommonJS,
-    })
+    const sourceFileNames = new Set([...typedefModuleList.map(m => 'modules/' + m), 'impact-core'])
+    for (const fileName in typedefsFiles) {
+        if (!sourceFileNames.has(fileName.slice(0, -'.d.ts'.length))) delete typedefsFiles[fileName]
+    }
+    const program = new TypescriptProgram(typedefsFiles)
 
-    program.getTypeChecker()
-
-    for (const sourceFile of program.getSourceFiles()) {
-        const baseName = path.basename(sourceFile.fileName)
+    for (const sourceFile of program.program.getSourceFiles()) {
+        const baseName = basename(sourceFile.fileName)
         if (!(baseName.startsWith('game') || baseName.startsWith('impact'))) continue
 
         const module = baseName.slice(0, -5)
         ts.forEachChild(sourceFile, node => visit(module, node, []))
     }
-    try {
-        await fs.promises.writeFile('typedefs.json', JSON.stringify(typedefModuleRecord, null, 4))
-    } catch {}
 
     return { typedefModuleRecord, classPathToModule }
 

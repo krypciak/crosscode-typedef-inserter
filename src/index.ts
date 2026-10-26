@@ -1,9 +1,12 @@
 import * as fs from 'fs'
-import { assert } from './misc'
-import { applyLebab } from './lebab'
-import { injectIntoGameCompiled } from './inject-into-game-compiled'
+
+import { assert } from './assert'
+import { combineChangeQueue } from './change-queue'
 import { createGameCompiledProgram, getTypeInjectsAndTypedStats } from './type-injects'
 import { getModulesInfo } from './modules-info'
+import { runLebabPasses, runPrettier } from './lebab'
+
+const fileExists = async (path: string) => !!(await fs.promises.stat(path).catch(_ => false))
 
 export async function run() {
     const typedefRepoPath = process.env['TYPEDEF_REPO']!
@@ -14,26 +17,46 @@ export async function run() {
     assert(outGameCompiledPath, 'OUTPUT_GAME_COMPILED_JS enviroment variable not set!')
     const outTypesPath: string = './typedefs.json'
 
-    gameCompiledPath = await applyLebab(gameCompiledPath)
+    let code: string
+    {
+        const lebabCodePath = './game-compiled/game.compiled.lebab.js'
+        if (await fileExists(lebabCodePath)) {
+            code = await fs.promises.readFile(lebabCodePath, 'utf8')
+        } else {
+            code = await fs.promises.readFile(gameCompiledPath, 'utf8')
+            code = await runPrettier(code)
+            code = await runLebabPasses(code)
 
-    const typedefModulesPath = `${typedefRepoPath}/modules`
-    const { typedefModuleRecord, classPathToModule } = await getModulesInfo(typedefModulesPath)
+            await fs.promises.writeFile(lebabCodePath, code)
+        }
+    }
+
+    const typedefsFiles = Object.fromEntries(
+        await Promise.all(
+            (await fs.promises.readdir(typedefRepoPath, { recursive: true }))
+                .filter(f => !f.startsWith('node_modules') && (f.endsWith('.ts') || f.endsWith('.js')))
+                .map(async f => [f, await fs.promises.readFile(typedefRepoPath + '/' + f, 'utf8')] as const)
+        )
+    )
+
+    const { typedefModuleRecord, classPathToModule } = await getModulesInfo(typedefsFiles)
     try {
         await fs.promises.writeFile(outTypesPath, JSON.stringify(typedefModuleRecord, null, 4))
     } catch (e) {
         console.error('error while writing types:', e)
     }
 
-    const gameCompiledInfo = await createGameCompiledProgram(gameCompiledPath)
+    const gameCompiledInfo = await createGameCompiledProgram(code)
 
     const { changeQueue, typedStats } = await getTypeInjectsAndTypedStats(
         classPathToModule,
         typedefModuleRecord,
-        typedefModulesPath,
+        typedefsFiles,
         gameCompiledInfo
     )
 
-    await injectIntoGameCompiled(gameCompiledPath, outGameCompiledPath, changeQueue)
+    const outputCode = combineChangeQueue(code, changeQueue)
+    await fs.promises.writeFile(outGameCompiledPath, outputCode, 'utf8')
 
     console.log('all done')
     console.log('result saved into', outGameCompiledPath)

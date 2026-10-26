@@ -1,18 +1,12 @@
-import * as fs from 'fs'
-import { assert } from './misc'
+import { assert } from './assert'
 
 export type ChangeQueue = ({ pos: number } & (
     | { operation: 'inject'; type: string; isOptional?: boolean }
     | { operation: 'rename'; from: string; to: string }
 ))[]
 
-export async function injectIntoGameCompiled(
-    gameCompiledPath: string,
-    outGameCompiledPath: string,
-    changeQueue: ChangeQueue
-) {
+export function combineChangeQueue(code: string, changeQueue: ChangeQueue): string {
     console.log('modifing code...')
-    const code = await fs.promises.readFile(gameCompiledPath, 'utf8')
 
     const res: string[] = []
     let i = 0
@@ -30,5 +24,5 @@ export async function injectIntoGameCompiled(
     }
     res.push(code.slice(i, code.length))
 
-    await fs.promises.writeFile(outGameCompiledPath, res.join(''), 'utf8')
+    return res.join('')
 }
